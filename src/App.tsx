@@ -8,7 +8,9 @@ import SuiviDevisPage from "@/pages/SuiviDevisPage";
 import CheckListsVLPage from "@/pages/CheckListsVLPage";
 import EntretiensPage from "@/pages/EntretiensPage";
 import EntretienBisPage from "@/pages/EntretienBisPage";
-import SuiviPannePage from "@/pages/SuiviPannePage"; // suivi-pannes
+import SuiviPannePage from "@/pages/SuiviPannePage";
+import PneumatiquePage from "@/pages/PneumatiquePage";
+import ImportGlobalPage from "@/pages/ImportGlobalPage";
 import UsersPage     from "@/pages/UsersPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -26,6 +28,8 @@ export default function App() {
       <Route path="/entretiens" element={<ProtectedRoute><EntretiensPage /></ProtectedRoute>} />
       <Route path="/entretiens-bis" element={<ProtectedRoute><EntretienBisPage /></ProtectedRoute>} />
       <Route path="/suivi-pannes" element={<ProtectedRoute><SuiviPannePage /></ProtectedRoute>} />
+      <Route path="/pneumatiques" element={<ProtectedRoute><PneumatiquePage /></ProtectedRoute>} />
+      <Route path="/import-global" element={<ProtectedRoute><ImportGlobalPage /></ProtectedRoute>} />
       <Route path="/users"     element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

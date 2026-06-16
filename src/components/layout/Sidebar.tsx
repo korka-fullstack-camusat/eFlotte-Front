@@ -13,6 +13,8 @@ import {
   FileText,
   ClipboardCheck,
   AlertTriangle,
+  CircleDot,
+  UploadCloud,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +27,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Tableau de bord", path: "/dashboard",  icon: <LayoutDashboard size={20} /> },
+  { label: "Import global",   path: "/import-global", icon: <UploadCloud size={20} /> },
   { label: "Données flottes", path: "/data-flottes", icon: <Database size={20} /> },
   { label: "TCD Technique",   path: "/tcd-technique", icon: <Table2 size={20} /> },
   { label: "Chauffeurs Pôles", path: "/chauffeurs-poles", icon: <Navigation size={20} /> },
@@ -33,6 +36,7 @@ const navItems: NavItem[] = [
   { label: "Entretiens",      path: "/entretiens", icon: <Wrench size={20} /> },
   { label: "Entretien BIS",   path: "/entretiens-bis", icon: <Wrench size={20} /> },
   { label: "Suivi des Pannes", path: "/suivi-pannes", icon: <AlertTriangle size={20} /> },
+  { label: "Pneumatiques",    path: "/pneumatiques",  icon: <CircleDot size={20} /> },
 ];
 
 const adminNavItem: NavItem = { label: "Comptes utilisateurs", path: "/users", icon: <Users size={20} /> };

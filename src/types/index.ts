@@ -272,6 +272,48 @@ export interface PannesFilters {
   search?: string;
 }
 
+export interface Pneumatique {
+  id: number;
+  fournisseur: string | null;
+  type_location: string | null;
+  immatriculation: string;
+  chauffeur: string | null;
+  kilometrage: number | null;
+  nb_pneus: number | null;
+  ref_pneu: string | null;
+  etat: string | null;
+  snc: string | null;
+  zone_intervention: string | null;
+  date_prevue: string | null;
+  commentaire: string | null;
+}
+
+export interface PneumatiquePage {
+  items: Pneumatique[];
+  total: number;
+}
+
+export interface FiltresPneumatiques {
+  fournisseurs: string[];
+  immatriculations: string[];
+  etats: string[];
+  sncs: string[];
+}
+
+export interface ImportPneumatiqueResult {
+  created: number;
+  updated: number;
+  errors: { ligne: number; message: string }[];
+}
+
+export interface PneumatiquesFilters {
+  fournisseur?: string;
+  immatriculation?: string;
+  etat?: string;
+  snc?: string;
+  search?: string;
+}
+
 export interface UserAccount {
   id: number;
   username: string;

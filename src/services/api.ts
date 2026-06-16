@@ -7,6 +7,7 @@ import type {
   SuiviDevis, SuiviDevisPage, FiltresDevis, DevisFilters, ImportDevisResult,
   CheckListVL, CheckListVLPage, FiltresCheckListVL, CheckListVLFilters, ImportCheckListVLResult,
   SuiviPanne, SuiviPannePage, FiltresSuiviPanne, PannesFilters, ImportSuiviPanneResult,
+  Pneumatique, PneumatiquePage, FiltresPneumatiques, PneumatiquesFilters, ImportPneumatiqueResult,
 } from "@/types";
 
 export const vehiculeService = {
@@ -263,6 +264,36 @@ export const suiviPanneService = {
     const formData = new FormData();
     formData.append("file", file);
     const { data } = await axios.post("/api/suivi-pannes/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+};
+
+export const pneumatiqueService = {
+  getAll: async (params?: PneumatiquesFilters & { page?: number; page_size?: number }): Promise<PneumatiquePage> => {
+    const { data } = await axios.get("/api/pneumatiques", { params });
+    return data;
+  },
+  create: async (payload: Partial<Pneumatique>): Promise<Pneumatique> => {
+    const { data } = await axios.post("/api/pneumatiques", payload);
+    return data;
+  },
+  update: async (id: number, payload: Partial<Pneumatique>): Promise<Pneumatique> => {
+    const { data } = await axios.patch(`/api/pneumatiques/${id}`, payload);
+    return data;
+  },
+  remove: async (id: number): Promise<void> => {
+    await axios.delete(`/api/pneumatiques/${id}`);
+  },
+  filtres: async (): Promise<FiltresPneumatiques> => {
+    const { data } = await axios.get("/api/pneumatiques/filtres");
+    return data;
+  },
+  importExcel: async (file: File): Promise<ImportPneumatiqueResult> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await axios.post("/api/pneumatiques/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return data;
