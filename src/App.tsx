@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage     from "@/pages/LoginPage";
+import LandingPage   from "@/pages/LandingPage";
 import DashboardPage from "@/pages/DashboardPage";
 import DataFlottesPage from "@/pages/DataFlottesPage";
 import TcdTechniquePage from "@/pages/TcdTechniquePage";
@@ -18,6 +19,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
 
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
@@ -34,8 +36,7 @@ export default function App() {
       <Route path="/import-global" element={<ProtectedRoute><ImportGlobalPage /></ProtectedRoute>} />
       <Route path="/users"     element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
 
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
