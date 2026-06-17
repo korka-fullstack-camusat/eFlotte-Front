@@ -1,4 +1,7 @@
 import axios from "axios";
+
+axios.defaults.baseURL = "http://192.168.1.50:8050";
+
 import type {
   Vehicule, UserAccount, CoutFlotte, CoutFlottePage, ImportCoutsResult,
   KpiCouts, EvolutionPoint, RepartitionPoint, VehiculeCoutPoint,
@@ -10,6 +13,10 @@ import type {
   Pneumatique, PneumatiquePage, FiltresPneumatiques, PneumatiquesFilters, ImportPneumatiqueResult,
   SuiviSinistre, SuiviSinistrePage, SinistresFilters, ImportSinistreResult,
 } from "@/types";
+
+
+
+
 
 export const vehiculeService = {
   getAll: async (): Promise<Vehicule[]> => {

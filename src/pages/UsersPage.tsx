@@ -125,8 +125,11 @@ export default function UsersPage() {
                         <button onClick={() => openEdit(u)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-camublue-900 transition">
                           <Pencil size={14} />
                         </button>
-                        {u.id !== currentUser?.id && (
-                          <button onClick={() => handleDelete(u)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition">
+                        {u.username !== currentUser?.username && (
+                          <button
+                            onClick={() => handleDelete(u)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition"
+                          >
                             <Trash2 size={14} />
                           </button>
                         )}

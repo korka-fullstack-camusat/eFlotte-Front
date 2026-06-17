@@ -249,7 +249,14 @@ export default function SuiviSinistrePage() {
         <KpiCard label="Total sinistres" value={total}         icon={<ShieldAlert size={20} />} bg="bg-camublue-900/10" text="text-camublue-900" />
         <KpiCard label="En instruction"  value={nbInstruction} icon={<Clock size={20} />}       bg="bg-amber-100"       text="text-amber-600" />
         <KpiCard label="Clôturés (page)" value={nbCloture}     icon={<CheckCircle2 size={20} />} bg="bg-emerald-100"    text="text-emerald-600" />
-        <KpiCard label="Total indemnités (page)" value={fmtMoney(totalMontant)} icon={<AlertTriangle size={20} />} bg="bg-blue-100" text="text-blue-600" />
+        <KpiCard
+          label="Total indemnités (page)"
+          value={totalMontant}
+          suffix=" FCFA"
+          icon={<AlertTriangle size={20} />}
+          bg="bg-blue-100"
+          text="text-blue-600"
+        />
       </div>
 
       {/* ── Recherche ───────────────────────────────────────────────────── */}
