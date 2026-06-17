@@ -3,6 +3,7 @@ import {
   Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Loader2,
   Car, DollarSign, Navigation, FileText, ClipboardCheck, Wrench,
   AlertOctagon, CircleDot, X, History, ChevronDown, ChevronUp,
+  ShieldAlert, LayoutGrid, ChevronRight as ChevronRightIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -57,6 +58,7 @@ const SECTIONS: {
   { key: "pneumatiques",   label: "Pneumatiques",         sheet: "PNEUMATIQUE",               icon: <CircleDot size={18} />,     color: "text-teal-700 bg-teal-100" },
 ];
 
+type ImportMode = null | "global" | "sinistres";
 type Status = "idle" | "loading" | "done" | "error";
 
 function fmtDate(iso: string) {
@@ -66,8 +68,10 @@ function fmtDate(iso: string) {
 }
 
 export default function ImportGlobalPage() {
-  const [status, setStatus] = useState<Status>("idle");
-  const [result, setResult] = useState<ImportResult | null>(null);
+  const [mode, setMode]       = useState<ImportMode>(null);
+  const [status, setStatus]   = useState<Status>("idle");
+  const [result, setResult]   = useState<ImportResult | null>(null);
+  const [sinistreResult, setSinistreResult] = useState<{ created: number; updated: number; errors: any[] } | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,28 +94,45 @@ export default function ImportGlobalPage() {
     setFileName(file.name);
     setStatus("loading");
     setResult(null);
+    setSinistreResult(null);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const { data } = await axios.post<ImportResult>("/api/import-global", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setResult(data);
-      setStatus("done");
 
-      const total = Object.values(data).reduce((s, r) => s + r.created + r.updated, 0);
-      const errors = Object.values(data).reduce((s, r) => s + r.errors.length, 0);
-      if (errors > 0) {
-        toast(`Import terminé : ${total} enregistrements — ${errors} ligne(s) ignorée(s)`, { icon: "⚠️" });
+      if (mode === "sinistres") {
+        const { data } = await axios.post("/api/sinistres/import", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setSinistreResult(data);
+        setStatus("done");
+        const errors = data.errors?.length ?? 0;
+        if (errors > 0) {
+          toast(`Import sinistres : ${data.created} créés, ${data.updated} MAJ — ${errors} erreur(s)`, { icon: "⚠️" });
+        } else {
+          toast.success(`Import sinistres : ${data.created} créés, ${data.updated} mis à jour`);
+        }
+        // Rafraîchir l'historique
+        axios.get<HistoryEntry[]>("/api/import-global/history")
+          .then(r => setHistory(r.data))
+          .catch(() => {});
       } else {
-        toast.success(`Import terminé : ${total} enregistrements traités`);
+        const { data } = await axios.post<ImportResult>("/api/import-global", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setResult(data);
+        setStatus("done");
+        const total = Object.values(data).reduce((s, r) => s + r.created + r.updated, 0);
+        const errors = Object.values(data).reduce((s, r) => s + r.errors.length, 0);
+        if (errors > 0) {
+          toast(`Import terminé : ${total} enregistrements — ${errors} ligne(s) ignorée(s)`, { icon: "⚠️" });
+        } else {
+          toast.success(`Import terminé : ${total} enregistrements traités`);
+        }
+        axios.get<HistoryEntry[]>("/api/import-global/history")
+          .then(r => setHistory(r.data))
+          .catch(() => {});
       }
-
-      // Refresh history
-      axios.get<HistoryEntry[]>("/api/import-global/history")
-        .then(r => setHistory(r.data))
-        .catch(() => {});
     } catch (err: any) {
       setStatus("error");
       toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
@@ -126,8 +147,10 @@ export default function ImportGlobalPage() {
   };
 
   const reset = () => {
+    setMode(null);
     setStatus("idle");
     setResult(null);
+    setSinistreResult(null);
     setFileName(null);
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -147,37 +170,44 @@ export default function ImportGlobalPage() {
           </p>
         </div>
 
-        {/* Zone de dépôt */}
-        {status === "idle" && (
-          <label
-            className={`flex flex-col items-center justify-center gap-4 border-2 border-dashed rounded-2xl py-16 px-8 cursor-pointer transition-all ${
-              dragging ? "border-camublue-900 bg-camublue-900/5" : "border-gray-200 hover:border-camublue-900/40"
-            }`}
-            onDragOver={e => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-          >
-            <div className="w-16 h-16 rounded-2xl bg-camublue-900/10 flex items-center justify-center">
-              <FileSpreadsheet size={32} className="text-camublue-900" />
-            </div>
-            <div className="text-center">
-              <p className="text-base font-semibold text-gray-700">Déposer le fichier Excel ici</p>
-              <p className="text-sm text-gray-400 mt-1">ou cliquer pour sélectionner un fichier (.xlsx)</p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2 mt-2">
-              {SECTIONS.map(s => (
-                <span key={s.key} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${s.color}`}>
-                  {s.icon} {s.label}
-                </span>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Feuilles détectées automatiquement : FLOTTE GLOBALE, DATA_FLOTTES, CHAUFFEUR POLES, SUIVI DES DEVIS, SUIVI DES CHECK LISTS VL, ENTRTIENS, ENTRETIEN BIS, SUIVI DES PANNE, PNEUMATIQUE
-            </p>
-            <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-          </label>
+        {/* ── Étape 1 : choix du type d'import ── */}
+        {status === "idle" && mode === null && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Carte Import global */}
+            <button
+              onClick={() => { setMode("global"); setTimeout(() => inputRef.current?.click(), 0); }}
+              className="group flex items-center gap-4 p-5 border-2 border-gray-200 hover:border-camublue-900 rounded-2xl text-left transition-all hover:bg-camublue-900/5"
+            >
+              <div className="w-11 h-11 rounded-xl bg-camublue-900/10 group-hover:bg-camublue-900/20 flex items-center justify-center shrink-0 transition">
+                <LayoutGrid size={22} className="text-camublue-900" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-800 text-sm">Import global</p>
+                <p className="text-xs text-gray-400 mt-0.5">Tableau de bord — 9 rubriques</p>
+              </div>
+              <ChevronRightIcon size={18} className="text-gray-300 group-hover:text-camublue-900 shrink-0 transition" />
+            </button>
+
+            {/* Carte Suivi sinistres */}
+            <button
+              onClick={() => { setMode("sinistres"); setTimeout(() => inputRef.current?.click(), 0); }}
+              className="group flex items-center gap-4 p-5 border-2 border-gray-200 hover:border-rose-400 rounded-2xl text-left transition-all hover:bg-rose-50/40"
+            >
+              <div className="w-11 h-11 rounded-xl bg-rose-100 group-hover:bg-rose-200 flex items-center justify-center shrink-0 transition">
+                <ShieldAlert size={22} className="text-rose-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-800 text-sm">Suivi des sinistres</p>
+                <p className="text-xs text-gray-400 mt-0.5">Feuille SUIVI DES ASSURANCES</p>
+              </div>
+              <ChevronRightIcon size={18} className="text-gray-300 group-hover:text-rose-400 shrink-0 transition" />
+            </button>
+          </div>
         )}
+
+        {/* input caché déclenché au clic sur les cartes */}
+        <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
 
         {/* En cours */}
         {status === "loading" && (
@@ -198,7 +228,53 @@ export default function ImportGlobalPage() {
           </div>
         )}
 
-        {/* Résultats */}
+        {/* ── Résultats Sinistres ── */}
+        {status === "done" && sinistreResult && (
+          <>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-bold text-emerald-600">{sinistreResult.created.toLocaleString("fr-FR")}</p>
+                <p className="text-xs text-emerald-700 font-medium mt-0.5">Créés</p>
+              </div>
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center">
+                <p className="text-2xl font-bold text-amber-600">{sinistreResult.updated.toLocaleString("fr-FR")}</p>
+                <p className="text-xs text-amber-700 font-medium mt-0.5">Mis à jour</p>
+              </div>
+              <div className={`border rounded-2xl p-4 text-center ${sinistreResult.errors.length > 0 ? "bg-red-50 border-red-100" : "bg-gray-50 border-gray-100"}`}>
+                <p className={`text-2xl font-bold ${sinistreResult.errors.length > 0 ? "text-red-600" : "text-gray-400"}`}>{sinistreResult.errors.length}</p>
+                <p className={`text-xs font-medium mt-0.5 ${sinistreResult.errors.length > 0 ? "text-red-700" : "text-gray-500"}`}>Erreurs</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-100 rounded-2xl mb-6">
+              <ShieldAlert size={20} className="text-rose-600 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-rose-700">Import Suivi des sinistres terminé</p>
+                <p className="text-xs text-rose-500 mt-0.5">Fichier : {fileName}</p>
+              </div>
+            </div>
+            {sinistreResult.errors.length > 0 && (
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-5 mb-6">
+                <p className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+                  <AlertTriangle size={15} /> Lignes ignorées
+                </p>
+                <ul className="text-xs text-red-500 list-disc pl-4 space-y-0.5 max-h-40 overflow-y-auto">
+                  {sinistreResult.errors.slice(0, 20).map((e: any, i: number) => (
+                    <li key={i}>Ligne {e.ligne} : {e.message}</li>
+                  ))}
+                  {sinistreResult.errors.length > 20 && <li>…et {sinistreResult.errors.length - 20} autres</li>}
+                </ul>
+              </div>
+            )}
+            <div className="flex justify-center mb-10">
+              <button onClick={reset}
+                className="flex items-center gap-2 px-6 py-3 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+                <Upload size={16} /> Nouvel import
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── Résultats Global ── */}
         {status === "done" && result && (
           <>
             {/* KPI recap */}
@@ -321,7 +397,7 @@ export default function ImportGlobalPage() {
             <div className="flex justify-center mb-10">
               <button onClick={reset}
                 className="flex items-center gap-2 px-6 py-3 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-                <Upload size={16} /> Importer un autre fichier
+                <Upload size={16} /> Nouvel import
               </button>
             </div>
           </>
@@ -339,7 +415,7 @@ export default function ImportGlobalPage() {
             </div>
             <button onClick={reset}
               className="px-5 py-2.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition">
-              Réessayer
+              Nouvel import
             </button>
           </div>
         )}

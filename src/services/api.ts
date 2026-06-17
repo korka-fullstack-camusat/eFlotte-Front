@@ -8,6 +8,7 @@ import type {
   CheckListVL, CheckListVLPage, FiltresCheckListVL, CheckListVLFilters, ImportCheckListVLResult,
   SuiviPanne, SuiviPannePage, FiltresSuiviPanne, PannesFilters, ImportSuiviPanneResult,
   Pneumatique, PneumatiquePage, FiltresPneumatiques, PneumatiquesFilters, ImportPneumatiqueResult,
+  SuiviSinistre, SuiviSinistrePage, SinistresFilters, ImportSinistreResult,
 } from "@/types";
 
 export const vehiculeService = {
@@ -264,6 +265,32 @@ export const suiviPanneService = {
     const formData = new FormData();
     formData.append("file", file);
     const { data } = await axios.post("/api/suivi-pannes/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+};
+
+export const suiSinistreService = {
+  getAll: async (params?: SinistresFilters): Promise<SuiviSinistrePage> => {
+    const { data } = await axios.get("/api/sinistres", { params });
+    return data;
+  },
+  create: async (payload: Partial<SuiviSinistre>): Promise<SuiviSinistre> => {
+    const { data } = await axios.post("/api/sinistres", payload);
+    return data;
+  },
+  update: async (id: number, payload: Partial<SuiviSinistre>): Promise<SuiviSinistre> => {
+    const { data } = await axios.put(`/api/sinistres/${id}`, payload);
+    return data;
+  },
+  remove: async (id: number): Promise<void> => {
+    await axios.delete(`/api/sinistres/${id}`);
+  },
+  importExcel: async (file: File): Promise<ImportSinistreResult> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await axios.post("/api/sinistres/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return data;

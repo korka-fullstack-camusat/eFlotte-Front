@@ -314,6 +314,48 @@ export interface PneumatiquesFilters {
   search?: string;
 }
 
+export interface SuiviSinistre {
+  id: number;
+  date_sinistre: string | null;
+  date_declaration: string | null;
+  type_location: string | null;
+  matricule: string | null;
+  nom_chauffeur: string | null;
+  snc: string | null;
+  projet: string | null;
+  circonstances: string | null;
+  statut: string | null;
+  montant_indemnite: number | null;
+  date_reglement: string | null;
+  observations: string | null;
+  dossier_suivi_par: string | null;
+  position_vehicule: string | null;
+  suivi_dossier_interne: string | null;
+  lieu_immobilisation: string | null;
+  documentation: boolean | null;
+  traiter: boolean | null;
+}
+
+export interface SuiviSinistrePage {
+  items: SuiviSinistre[];
+  total: number;
+}
+
+export interface SinistresFilters {
+  search?: string;
+  statut?: string;
+  type_location?: string;
+  circonstances?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface ImportSinistreResult {
+  created: number;
+  updated: number;
+  errors: { ligne: number; message: string }[];
+}
+
 export interface UserAccount {
   id: number;
   username: string;

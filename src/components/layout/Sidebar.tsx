@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   CircleDot,
   UploadCloud,
+  ShieldAlert,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { label: "Entretien BIS",   path: "/entretiens-bis", icon: <Wrench size={20} /> },
   { label: "Suivi des Pannes", path: "/suivi-pannes", icon: <AlertTriangle size={20} /> },
   { label: "Pneumatiques",    path: "/pneumatiques",  icon: <CircleDot size={20} /> },
+  { label: "Suivi sinistres", path: "/suivi-sinistres", icon: <ShieldAlert size={20} /> },
 ];
 
 const adminNavItem: NavItem = { label: "Comptes utilisateurs", path: "/users", icon: <Users size={20} /> };
