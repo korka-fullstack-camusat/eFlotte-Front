@@ -9,6 +9,7 @@ import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { coutService } from "@/services/api";
 import type { CoutFlotte, FiltresCouts, CoutsFilters } from "@/types";
+import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } from "@/components/ChartFilterBar";
 
 const PAGE_SIZE = 10;
 
@@ -72,6 +73,8 @@ export default function DataFlottesPage() {
   const [search, setSearch] = useState("");
   const [showExport, setShowExport] = useState(false);
 
+  const [chartFilter, setChartFilter] = useState<ChartFilter>(CHART_FILTER_EMPTY);
+
   const [showCharts, setShowCharts] = useState(false);
   const [loadingCharts, setLoadingCharts] = useState(false);
   const [chartType, setChartType] = useState<{ label: string; value: number }[]>([]);
@@ -91,14 +94,39 @@ export default function DataFlottesPage() {
   useEffect(() => { coutService.filtres().then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { setPage(1); }, [filters]);
 
+  useEffect(() => {
+    if (!showCharts) return;
+    const timer = setTimeout(() => {
+      setLoadingCharts(true);
+      const cf = chartFilter;
+      const extra: any = {};
+      if (cf.annee) extra.annee = cf.annee;
+      Promise.all([
+        coutService.pivot({ ...filters, ...extra, group_by: "type_cout" }),
+        coutService.pivot({ ...filters, ...extra, group_by: "type_vehicule", type_cout: "TOTAL" }),
+        coutService.pivot({ ...filters, ...extra, group_by: "fournisseur", type_cout: "TOTAL" }),
+        coutService.pivot({ ...filters, ...extra, group_by: "plaque", type_cout: "TOTAL" }),
+      ]).then(([typ, veh, fourn, pla]) => {
+        setChartType(toTop(typ.items, 10, l => TYPE_COUT_LABELS[l] ?? l));
+        setChartVeh(toTop(veh.items, 10));
+        setChartFourn(toTop(fourn.items, 10));
+        setChartPlaque(toTop(pla.items, 10));
+      }).catch(() => {}).finally(() => setLoadingCharts(false));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [chartFilter, showCharts]);
+
   const openCharts = () => {
     setShowCharts(true);
     setLoadingCharts(true);
+    const cf = chartFilter;
+    const extra: any = {};
+    if (cf.annee) extra.annee = cf.annee;
     Promise.all([
-      coutService.pivot({ ...filters, group_by: "type_cout" }),
-      coutService.pivot({ ...filters, group_by: "type_vehicule", type_cout: "TOTAL" }),
-      coutService.pivot({ ...filters, group_by: "fournisseur", type_cout: "TOTAL" }),
-      coutService.pivot({ ...filters, group_by: "plaque", type_cout: "TOTAL" }),
+      coutService.pivot({ ...filters, ...extra, group_by: "type_cout" }),
+      coutService.pivot({ ...filters, ...extra, group_by: "type_vehicule", type_cout: "TOTAL" }),
+      coutService.pivot({ ...filters, ...extra, group_by: "fournisseur", type_cout: "TOTAL" }),
+      coutService.pivot({ ...filters, ...extra, group_by: "plaque", type_cout: "TOTAL" }),
     ]).then(([typ, veh, fourn, pla]) => {
       setChartType(toTop(typ.items, 10, l => TYPE_COUT_LABELS[l] ?? l));
       setChartVeh(toTop(veh.items, 10));
@@ -194,35 +222,37 @@ export default function DataFlottesPage() {
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-camublue-900">Gestion des données flottes</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Données brutes des coûts de la flotte (format long)</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={openCharts}
-            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-            <BarChart2 size={15} /><span>Voir graphiques</span>
-          </button>
-          <button onClick={openFilterModal}
-            className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm relative">
-            <Filter size={15} /><span>Filtres</span>
-            {hasFilters && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-bold">
-                {Object.keys(filters).length}
-              </span>
-            )}
-          </button>
-          <button onClick={() => setShowExport(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-            <Download size={15} /><span>Exporter</span>
-          </button>
-          {!isViewer && (
-            <button onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-              <Plus size={15} /><span>Ajouter</span>
+      <div className="mb-8">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-camublue-900">Gestion des données flottes</h1>
+            <p className="text-gray-500 text-sm mt-0.5">Données brutes des coûts de la flotte (format long)</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={openCharts}
+              className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+              <BarChart2 size={15} /><span>Voir graphiques</span>
             </button>
-          )}
+            <button onClick={openFilterModal}
+              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm relative">
+              <Filter size={15} /><span>Filtres</span>
+              {hasFilters && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-bold">
+                  {Object.keys(filters).length}
+                </span>
+              )}
+            </button>
+            <button onClick={() => setShowExport(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+              <Download size={15} /><span>Exporter</span>
+            </button>
+            {!isViewer && (
+              <button onClick={openCreate}
+                className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+                <Plus size={15} /><span>Ajouter</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -288,12 +318,17 @@ export default function DataFlottesPage() {
       {showCharts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowCharts(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><BarChart2 size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Graphiques — Données Flottes</p>
+            <div className="bg-camublue-900 px-5 py-3 flex items-center gap-3 flex-wrap sticky top-0 z-10">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <BarChart2 size={16} className="text-white" />
               </div>
-              <button onClick={() => setShowCharts(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
+              <p className="text-white font-bold text-sm shrink-0">Graphiques — Données Flottes</p>
+              <div className="flex-1 flex justify-center">
+                <ChartFilterBar filter={chartFilter} onChange={setChartFilter} />
+              </div>
+              <button onClick={() => setShowCharts(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition shrink-0 ml-auto">
+                <X size={14} className="text-white" />
+              </button>
             </div>
 
             <div className="overflow-y-auto flex-1 p-6">
