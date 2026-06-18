@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Filter, Settings, Pencil, Trash2, FileText, Search, ListOrdered, Building2, ClipboardList, BarChart2 } from "lucide-react";
+import { Plus, X, Download, Filter, Settings, Pencil, Trash2, FileText, Search, ListOrdered, Building2, ClipboardList, BarChart2 } from "lucide-react";
+import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   Tooltip as RTooltip, Cell, PieChart, Pie, Legend,
@@ -10,7 +11,7 @@ import { KpiCard } from "@/components/charts";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { suiviDevisService } from "@/services/api";
-import type { SuiviDevis, FiltresDevis, DevisFilters, ImportDevisResult } from "@/types";
+import type { SuiviDevis, FiltresDevis, DevisFilters } from "@/types";
 
 const PAGE_SIZE = 10;
 
@@ -54,9 +55,6 @@ export default function SuiviDevisPage() {
   const [form, setForm] = useState(EMPTY);
   const [manageRow, setManageRow] = useState<SuiviDevis | null>(null);
 
-  const [importModal, setImportModal] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<ImportDevisResult | null>(null);
   const [search, setSearch] = useState("");
 
   const [showCharts, setShowCharts] = useState(false);
@@ -154,23 +152,18 @@ export default function SuiviDevisPage() {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setResult(null);
-    try {
-      const res = await suiviDevisService.importExcel(file);
-      setResult(res);
-      toast.success(`Import terminé : ${res.created} créés, ${res.updated} mis à jour`);
-      load();
-      suiviDevisService.filtres().then(setFiltres).catch(() => {});
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
-    } finally {
-      setImporting(false);
-    }
-  };
+  const [showExport, setShowExport] = useState(false);
+  const exportCols: ExportColDef<SuiviDevis>[] = [
+    { key: "descriptions",  header: "Descriptions",           value: r => r.descriptions ?? "" },
+    { key: "numero_devis",  header: "N° Devis",               value: r => r.numero_devis ?? "" },
+    { key: "valeur_devis",  header: "Valeur devis",            value: r => r.valeur_devis ?? "" },
+    { key: "date",          header: "Date",                    value: r => r.date?.slice(0, 10) ?? "" },
+    { key: "montant",       header: "Montant",                 value: r => r.montant ?? "" },
+    { key: "sous_traitant", header: "Sous-traitant/Suppliers", value: r => r.sous_traitant ?? "" },
+    { key: "matricule",     header: "Matricule",               value: r => r.matricule ?? "" },
+    { key: "code_snc",      header: "Code SNC",                value: r => r.code_snc ?? "" },
+    { key: "po_emis",       header: "PO Emis",                 value: r => r.po_emis ?? "" },
+  ];
 
   const filteredItems = items.filter(d => {
     const q = search.trim().toLowerCase();
@@ -201,17 +194,15 @@ export default function SuiviDevisPage() {
               </span>
             )}
           </button>
+          <button onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+            <Download size={15} /><span>Exporter</span>
+          </button>
           {!isViewer && (
-            <>
-              <button onClick={() => { setImportModal(true); setResult(null); }}
-                className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-                <Upload size={15} /><span>Importer</span>
-              </button>
-              <button onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-                <Plus size={15} /><span>Ajouter</span>
-              </button>
-            </>
+            <button onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+              <Plus size={15} /><span>Ajouter</span>
+            </button>
           )}
         </div>
       </div>
@@ -255,12 +246,11 @@ export default function SuiviDevisPage() {
                   <th className="text-left px-4 py-2.5 font-semibold">Matricule</th>
                   <th className="text-left px-4 py-2.5 font-semibold">Code SNC</th>
                   <th className="text-left px-4 py-2.5 font-semibold">PO Emis</th>
-                  {!isViewer && <th className="text-center px-4 py-2.5 font-semibold">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredItems.map(d => (
-                  <tr key={d.id} className="hover:bg-gray-50/60">
+                  <tr key={d.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(d)}>
                     <td className="px-4 py-2.5 font-semibold text-gray-700 whitespace-nowrap">{d.descriptions || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.numero_devis || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatMontant(d.valeur_devis)}</td>
@@ -270,14 +260,6 @@ export default function SuiviDevisPage() {
                     <td className="px-4 py-2.5 text-camublue-900 font-medium whitespace-nowrap">{d.matricule || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.code_snc || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.po_emis || "—"}</td>
-                    {!isViewer && (
-                      <td className="px-4 py-2.5 text-center">
-                        <button onClick={() => setManageRow(d)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-lg text-xs font-semibold transition">
-                          <Settings size={13} /> Gérer
-                        </button>
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -424,60 +406,6 @@ export default function SuiviDevisPage() {
         </div>
       )}
 
-      {/* ══ Modal Import ════════════════════════════════════════════ */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importing && setImportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><FileSpreadsheet size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Importer SUIVI DES DEVIS (Excel)</p>
-              </div>
-              <button onClick={() => !importing && setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">
-                Sélectionnez le fichier Excel contenant la feuille <strong>SUIVI DES DEVIS</strong> (colonnes : DESCRIPTIONS, # N° DEVIS, VALEUR DEVIS, DATE, MONTANT, SOUS-TRAITANT/SUPPLIERS, MATRICULE, CODE SNC, PO EMIS).
-              </p>
-
-              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-8 cursor-pointer hover:border-camublue-900/40 transition">
-                <Upload size={24} className="text-camublue-900" />
-                <span className="text-sm font-semibold text-gray-700">{importing ? "Import en cours…" : "Choisir un fichier .xlsx"}</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing} onChange={handleFile} />
-              </label>
-
-              {result && (
-                <div className="rounded-xl border border-gray-100 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
-                    <CheckCircle2 size={16} /> {result.created} créés · {result.updated} mis à jour
-                  </div>
-                  {result.errors.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-amber-600 text-sm font-semibold">
-                        <AlertTriangle size={16} /> {result.errors.length} ligne(s) ignorée(s)
-                      </div>
-                      <ul className="text-xs text-gray-500 max-h-32 overflow-y-auto list-disc pl-5">
-                        {result.errors.slice(0, 20).map((e, i) => (
-                          <li key={i}>Ligne {e.ligne} : {e.message}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => setImportModal(false)} disabled={importing}
-                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ══ Modal Gérer ════════════════════════════════════════════ */}
       {manageRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setManageRow(null)}>
@@ -498,26 +426,32 @@ export default function SuiviDevisPage() {
                 <p><span className="font-semibold text-gray-700">Montant :</span> {formatMontant(manageRow.montant)}</p>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <button
                   onClick={() => { const d = manageRow; setManageRow(null); openEdit(d); }}
-                  className="flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Pencil size={14} /> Modifier
+                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Pencil size={14} /> Mise à jour
                 </button>
                 <button
                   onClick={() => { const d = manageRow; setManageRow(null); handleDelete(d); }}
-                  className="flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
+                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
                   <Trash2 size={14} /> Supprimer
-                </button>
-                <button type="button" onClick={() => setManageRow(null)}
-                  className="border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
-                  Fermer
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {showExport && (
+        <ExportModal
+          title="Exporter — Suivi Devis"
+          cols={exportCols}
+          filename="Suivi_Devis"
+          onClose={() => setShowExport(false)}
+          fetchAll={async () => (await suiviDevisService.getAll({ ...filters, page: 1, page_size: 9999 })).items}
+        />
+      )}
+
       {/* ══ Modal Graphiques ══════════════════════════════════════════════ */}
       {showCharts && (() => {
         const COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#10b981", "#ef4444", "#eab308", "#0ea5e9"];

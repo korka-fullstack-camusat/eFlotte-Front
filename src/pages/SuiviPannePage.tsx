@@ -1,8 +1,9 @@
 // Suivi des Pannes — feuille SUIVI DES PANNE
 import { useEffect, useState, useCallback } from "react";
+import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
-  Plus, Pencil, Trash2, X, Upload, Search, Filter,
-  AlertTriangle, CheckCircle2, Clock, Wrench, Settings, FileSpreadsheet, BarChart2,
+  Plus, Pencil, Trash2, X, Download, Search, Filter,
+  AlertTriangle, CheckCircle2, Clock, Wrench, Settings, BarChart2,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
@@ -14,7 +15,7 @@ import { KpiCard } from "@/components/charts";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { suiviPanneService } from "@/services/api";
-import type { SuiviPanne, FiltresSuiviPanne, ImportSuiviPanneResult, PannesFilters } from "@/types";
+import type { SuiviPanne, FiltresSuiviPanne, PannesFilters } from "@/types";
 
 const PAGE_SIZE = 10;
 
@@ -87,9 +88,6 @@ export default function SuiviPannePage() {
   const [form, setForm] = useState<Partial<SuiviPanne>>(EMPTY);
   const [manageRow, setManageRow] = useState<SuiviPanne | null>(null);
 
-  const [importModal, setImportModal] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<ImportSuiviPanneResult | null>(null);
 
   const [showCharts, setShowCharts] = useState(false);
   const [allPannes, setAllPannes] = useState<SuiviPanne[]>([]);
@@ -158,24 +156,20 @@ export default function SuiviPannePage() {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setImportResult(null);
-    try {
-      const res = await suiviPanneService.importExcel(file);
-      setImportResult(res);
-      toast.success(`Import : ${res.created} créés, ${res.updated} mis à jour`);
-      load();
-      suiviPanneService.filtres().then(setFiltres).catch(() => {});
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
-    } finally {
-      setImporting(false);
-      e.target.value = "";
-    }
-  };
+  const [showExport, setShowExport] = useState(false);
+  const exportCols: ExportColDef<SuiviPanne>[] = [
+    { key: "date",                  header: "Date",                 value: r => r.date?.slice(0, 10) ?? "" },
+    { key: "immatriculation",       header: "Plaque",               value: r => r.immatriculation ?? "" },
+    { key: "nom",                   header: "Chauffeur",            value: r => r.nom ?? "" },
+    { key: "garage",                header: "Garage",               value: r => r.garage ?? "" },
+    { key: "nature_panne",          header: "Nature de la panne",   value: r => r.nature_panne ?? "" },
+    { key: "date_indisponibilite",  header: "Date indisponibilité", value: r => r.date_indisponibilite?.slice(0, 10) ?? "" },
+    { key: "projet",                header: "Projet",               value: r => r.projet ?? "" },
+    { key: "date_fin_reparation",   header: "Fin réparation",       value: r => r.date_fin_reparation?.slice(0, 10) ?? "" },
+    { key: "site",                  header: "Site",                 value: r => r.site ?? "" },
+    { key: "immobilisation_jrs",    header: "Immobilisation (jrs)", value: r => r.immobilisation_jrs ?? "" },
+    { key: "commentaire",           header: "Commentaire",          value: r => r.commentaire ?? "" },
+  ];
 
   const applyFilters = () => { setFilters(draftFilters); setShowFilters(false); };
   const resetFilters = () => { setDraftFilters({}); setFilters({}); setShowFilters(false); };
@@ -203,17 +197,15 @@ export default function SuiviPannePage() {
                 </span>
               )}
             </button>
+            <button onClick={() => setShowExport(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+              <Download size={15} /><span>Exporter</span>
+            </button>
             {!isViewer && (
-              <>
-                <button onClick={() => { setImportModal(true); setImportResult(null); }}
-                  className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-                  <Upload size={15} /><span>Importer (Excel)</span>
-                </button>
-                <button onClick={openCreate}
-                  className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-                  <Plus size={15} /><span>Ajouter</span>
-                </button>
-              </>
+              <button onClick={openCreate}
+                className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+                <Plus size={15} /><span>Ajouter</span>
+              </button>
             )}
           </div>
       </div>
@@ -258,12 +250,11 @@ export default function SuiviPannePage() {
                   <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Site</th>
                   <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Immo. (jrs)</th>
                   <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Statut</th>
-                  {!isViewer && <th className="text-center px-3 py-2.5 font-semibold">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {items.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50/60 transition">
+                  <tr key={p.id} className="hover:bg-gray-50/60 transition cursor-pointer" onClick={() => setManageRow(p)}>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{fmt(p.date)}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap font-semibold text-gray-800">{p.immatriculation}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{p.nom || "—"}</td>
@@ -281,14 +272,6 @@ export default function SuiviPannePage() {
                       {p.immobilisation_jrs != null ? p.immobilisation_jrs : "—"}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap"><StatutBadge panne={p} /></td>
-                    {!isViewer && (
-                      <td className="px-4 py-2.5 text-center">
-                        <button onClick={() => setManageRow(p)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-lg text-xs font-semibold transition">
-                          <Settings size={13} /> Gérer
-                        </button>
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -396,53 +379,6 @@ export default function SuiviPannePage() {
         </div>
       )}
 
-      {/* ══ Modal Import ══════════════════════════════════════════════════ */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importing && setImportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><FileSpreadsheet size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Importer SUIVI DES PANNE (Excel)</p>
-              </div>
-              <button onClick={() => setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-500">
-                Sélectionnez le fichier Excel contenant la feuille <strong>SUIVI DES PANNE</strong>.
-                Colonnes reconnues : DATE, IMMA, NOM, GARAGE, Nature de panne, Date d'indisponibilité, PROJET, Date de fin de réparation, SITE, Commentaire.
-              </p>
-              <label className={`flex items-center justify-center gap-2 w-full py-4 rounded-xl border-2 border-dashed cursor-pointer transition
-                ${importing ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed" : "border-camublue-900/40 hover:bg-camublue-900/5 text-camublue-900"}`}>
-                <Upload size={18} />
-                <span className="text-sm font-semibold">{importing ? "Import en cours…" : "Choisir un fichier .xlsx"}</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} disabled={importing} />
-              </label>
-              {importResult && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-sm text-emerald-700">
-                  <p className="font-semibold mb-1">Import terminé</p>
-                  <p>{importResult.created} ligne(s) créée(s) · {importResult.updated} mise(s) à jour</p>
-                  {importResult.errors.length > 0 && (
-                    <div className="mt-2 text-red-600">
-                      <p className="font-semibold">{importResult.errors.length} erreur(s) :</p>
-                      {importResult.errors.slice(0, 5).map((e, i) => (
-                        <p key={i} className="text-xs">Ligne {e.ligne} : {e.message}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => setImportModal(false)} disabled={importing}
-                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ══ Modal Gérer ══════════════════════════════════════════════════ */}
       {manageRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setManageRow(null)}>
@@ -463,25 +399,31 @@ export default function SuiviPannePage() {
                 <p><span className="font-semibold text-gray-700">Immobilisation :</span> {manageRow.immobilisation_jrs != null ? `${manageRow.immobilisation_jrs} jrs` : "—"}</p>
                 <p><span className="font-semibold text-gray-700">Statut :</span> <StatutBadge panne={manageRow} /></p>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <button
                   onClick={() => { const m = manageRow; setManageRow(null); openEdit(m); }}
-                  className="flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Pencil size={14} /> Modifier
+                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Pencil size={14} /> Mise à jour
                 </button>
                 <button
                   onClick={() => { const m = manageRow; setManageRow(null); handleDelete(m); }}
-                  className="flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
+                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
                   <Trash2 size={14} /> Supprimer
-                </button>
-                <button type="button" onClick={() => setManageRow(null)}
-                  className="border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
-                  Fermer
                 </button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {showExport && (
+        <ExportModal
+          title="Exporter — Suivi des Pannes"
+          cols={exportCols}
+          filename="Suivi_Pannes"
+          onClose={() => setShowExport(false)}
+          fetchAll={async () => (await suiviPanneService.getAll({ ...filters, page: 1, page_size: 9999 })).items}
+        />
       )}
 
       {/* ══ Modal Graphiques ══════════════════════════════════════════════ */}

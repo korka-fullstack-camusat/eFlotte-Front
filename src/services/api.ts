@@ -1,6 +1,8 @@
 import axios from "axios";
 
-axios.defaults.baseURL = "http://192.168.1.50:8050";
+if (import.meta.env.VITE_API_URL) {
+  axios.defaults.baseURL = import.meta.env.VITE_API_URL;
+}
 
 import type {
   Vehicule, UserAccount, CoutFlotte, CoutFlottePage, ImportCoutsResult,

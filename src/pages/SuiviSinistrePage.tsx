@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
+import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
-  Plus, Pencil, Trash2, X, Upload, Search, Filter,
-  AlertTriangle, CheckCircle2, Clock, ShieldAlert, Settings, FileSpreadsheet, BarChart2,
+  Plus, Pencil, Trash2, X, Download, Search, Filter,
+  AlertTriangle, CheckCircle2, Clock, ShieldAlert, Settings, BarChart2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell,
@@ -13,7 +14,7 @@ import { KpiCard } from "@/components/charts";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { suiSinistreService } from "@/services/api";
-import type { SuiviSinistre, SinistresFilters, ImportSinistreResult } from "@/types";
+import type { SuiviSinistre, SinistresFilters } from "@/types";
 
 const PAGE_SIZE = 10;
 
@@ -112,9 +113,6 @@ export default function SuiviSinistrePage() {
   const [form, setForm]       = useState<Partial<SuiviSinistre>>(EMPTY);
   const [manageRow, setManageRow] = useState<SuiviSinistre | null>(null);
 
-  const [importModal, setImportModal]   = useState(false);
-  const [importing, setImporting]       = useState(false);
-  const [importResult, setImportResult] = useState<ImportSinistreResult | null>(null);
 
   const [showCharts, setShowCharts]       = useState(false);
   const [allSinistres, setAllSinistres]   = useState<SuiviSinistre[]>([]);
@@ -182,23 +180,22 @@ export default function SuiviSinistrePage() {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setImportResult(null);
-    try {
-      const res = await suiSinistreService.importExcel(file);
-      setImportResult(res);
-      toast.success(`Import : ${res.created} créés, ${res.updated} mis à jour`);
-      load();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
-    } finally {
-      setImporting(false);
-      e.target.value = "";
-    }
-  };
+  const [showExport, setShowExport] = useState(false);
+  const exportCols: ExportColDef<SuiviSinistre>[] = [
+    { key: "date_sinistre",       header: "Date sinistre",       value: r => r.date_sinistre?.slice(0, 10) ?? "" },
+    { key: "date_declaration",    header: "Date déclaration",    value: r => r.date_declaration?.slice(0, 10) ?? "" },
+    { key: "type_location",       header: "Propriété",           value: r => r.type_location ?? "" },
+    { key: "matricule",           header: "Matricule",           value: r => r.matricule ?? "" },
+    { key: "nom_chauffeur",       header: "Chauffeur",           value: r => r.nom_chauffeur ?? "" },
+    { key: "snc",                 header: "SNC",                 value: r => r.snc ?? "" },
+    { key: "projet",              header: "Projet",              value: r => r.projet ?? "" },
+    { key: "circonstances",       header: "Circonstances",       value: r => r.circonstances ?? "" },
+    { key: "statut",              header: "Statut",              value: r => r.statut ?? "" },
+    { key: "montant_indemnite",   header: "Montant HT",          value: r => r.montant_indemnite ?? "" },
+    { key: "date_reglement",      header: "Date règlement",      value: r => r.date_reglement?.slice(0, 10) ?? "" },
+    { key: "dossier_suivi_par",   header: "Suivi par",           value: r => r.dossier_suivi_par ?? "" },
+    { key: "lieu_immobilisation", header: "Lieu immobilisation", value: r => r.lieu_immobilisation ?? "" },
+  ];
 
   const applyFilters = () => { setFilters(draftFilters); setShowFilters(false); };
   const resetFilters = () => { setDraftFilters({}); setFilters({}); setShowFilters(false); };
@@ -229,17 +226,15 @@ export default function SuiviSinistrePage() {
               </span>
             )}
           </button>
+          <button onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+            <Download size={15} /> Exporter
+          </button>
           {!isViewer && (
-            <>
-              <button onClick={() => { setImportModal(true); setImportResult(null); }}
-                className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-                <Upload size={15} /> Importer (Excel)
-              </button>
-              <button onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-                <Plus size={15} /> Ajouter
-              </button>
-            </>
+            <button onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+              <Plus size={15} /> Ajouter
+            </button>
           )}
         </div>
       </div>
@@ -293,12 +288,11 @@ export default function SuiviSinistrePage() {
                   <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Date règlement</th>
                   <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Suivi par</th>
                   <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Lieu</th>
-                  {!isViewer && <th className="text-center px-3 py-2.5 font-semibold">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {items.map(s => (
-                  <tr key={s.id} className="hover:bg-gray-50/60 transition">
+                  <tr key={s.id} className="hover:bg-gray-50/60 transition cursor-pointer" onClick={() => setManageRow(s)}>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{fmt(s.date_sinistre)}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{fmt(s.date_declaration)}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
@@ -320,14 +314,6 @@ export default function SuiviSinistrePage() {
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{fmt(s.date_reglement)}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{s.dossier_suivi_par || "—"}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{s.lieu_immobilisation || "—"}</td>
-                    {!isViewer && (
-                      <td className="px-4 py-2.5 text-center">
-                        <button onClick={() => setManageRow(s)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-lg text-xs font-semibold transition">
-                          <Settings size={13} /> Gérer
-                        </button>
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -450,50 +436,6 @@ export default function SuiviSinistrePage() {
         </div>
       )}
 
-      {/* ══ Modal Import ══════════════════════════════════════════════════ */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importing && setImportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><FileSpreadsheet size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Importer SUIVI DES ASSURANCES (Excel)</p>
-              </div>
-              <button onClick={() => setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-500">
-                Sélectionnez le fichier Excel contenant la feuille <strong>SUIVI DES ASSURANCES</strong>.
-              </p>
-              <label className={`flex items-center justify-center gap-2 w-full py-4 rounded-xl border-2 border-dashed cursor-pointer transition
-                ${importing ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed" : "border-camublue-900/40 hover:bg-camublue-900/5 text-camublue-900"}`}>
-                <Upload size={18} />
-                <span className="text-sm font-semibold">{importing ? "Import en cours…" : "Choisir un fichier .xlsx"}</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} disabled={importing} />
-              </label>
-              {importResult && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-sm text-emerald-700">
-                  <p className="font-semibold mb-1">Import terminé</p>
-                  <p>{importResult.created} ligne(s) créée(s) · {importResult.updated} mise(s) à jour</p>
-                  {importResult.errors.length > 0 && (
-                    <div className="mt-2 text-red-600">
-                      <p className="font-semibold">{importResult.errors.length} erreur(s) :</p>
-                      {importResult.errors.slice(0, 5).map((e, i) => (
-                        <p key={i} className="text-xs">Ligne {e.ligne} : {e.message}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => setImportModal(false)} disabled={importing}
-                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Fermer</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ══ Modal Gérer ═══════════════════════════════════════════════════ */}
       {manageRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setManageRow(null)}>
@@ -514,21 +456,29 @@ export default function SuiviSinistrePage() {
                 <p><span className="font-semibold text-gray-700">Montant :</span> {fmtMoney(manageRow.montant_indemnite)}</p>
                 <p><span className="font-semibold text-gray-700">Observations :</span> {manageRow.observations || "—"}</p>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <button onClick={() => { const r = manageRow; setManageRow(null); openEdit(r); }}
-                  className="flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Pencil size={14} /> Modifier
+                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Pencil size={14} /> Mise à jour
                 </button>
                 <button onClick={() => { const r = manageRow; setManageRow(null); handleDelete(r); }}
-                  className="flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
+                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
                   <Trash2 size={14} /> Supprimer
                 </button>
-                <button onClick={() => setManageRow(null)}
-                  className="border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">Fermer</button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {showExport && (
+        <ExportModal
+          title="Exporter — Suivi des sinistres"
+          cols={exportCols}
+          filename="Suivi_Sinistres"
+          onClose={() => setShowExport(false)}
+          fetchAll={async () => (await suiSinistreService.getAll({ ...filters, page: 1, page_size: 9999 })).items}
+        />
       )}
 
       {/* ══ Modal Graphiques ══════════════════════════════════════════════ */}

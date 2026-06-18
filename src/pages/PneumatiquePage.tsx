@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Filter, Settings, Pencil, Trash2, Search, ListOrdered, Gauge, CircleDot, BarChart2 } from "lucide-react";
+import { Plus, X, Download, Filter, Settings, Pencil, Trash2, Search, ListOrdered, Gauge, CircleDot, BarChart2 } from "lucide-react";
+import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, Cell } from "recharts";
 import toast from "react-hot-toast";
 import AppLayout from "@/components/layout/AppLayout";
@@ -7,7 +8,7 @@ import { KpiCard } from "@/components/charts";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { pneumatiqueService } from "@/services/api";
-import type { Pneumatique, FiltresPneumatiques, PneumatiquesFilters, ImportPneumatiqueResult } from "@/types";
+import type { Pneumatique, FiltresPneumatiques, PneumatiquesFilters } from "@/types";
 
 const PAGE_SIZE = 10;
 
@@ -51,14 +52,44 @@ export default function PneumatiquePage() {
   const [form, setForm] = useState(EMPTY);
   const [manageRow, setManageRow] = useState<Pneumatique | null>(null);
 
-  const [importModal, setImportModal] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<ImportPneumatiqueResult | null>(null);
   const [search, setSearch] = useState("");
 
   const [showCharts, setShowCharts] = useState(false);
   const [allItems, setAllItems] = useState<Pneumatique[]>([]);
   const [loadingCharts, setLoadingCharts] = useState(false);
+
+  type QuickEditField = "fournisseur" | "type_location" | "chauffeur" | "kilometrage" | "nb_pneus" | "ref_pneu" | "etat" | "snc" | "zone_intervention" | "date_prevue" | "commentaire";
+  const [quickEdit, setQuickEdit] = useState<{ item: Pneumatique; field: QuickEditField; label: string; type: "text" | "number" | "date" | "textarea"; current: string } | null>(null);
+  const [quickValue, setQuickValue] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const openQuickEdit = (e: React.MouseEvent, item: Pneumatique, field: QuickEditField, label: string, type: "text" | "number" | "date" | "textarea") => {
+    e.stopPropagation();
+    if (isViewer) return;
+    const current = item[field] != null ? String(item[field]) : "";
+    setQuickEdit({ item, field, label, type, current });
+    setQuickValue(current);
+  };
+
+  const handleQuickSave = async () => {
+    if (!quickEdit) return;
+    setQuickSaving(true);
+    try {
+      const { item, field, type } = quickEdit;
+      const val = quickValue.trim();
+      const payload: any = {
+        [field]: val === "" ? null : type === "number" ? Number(val) : val,
+      };
+      await pneumatiqueService.update(item.id, payload);
+      toast.success("Mis à jour");
+      setQuickEdit(null);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur");
+    } finally {
+      setQuickSaving(false);
+    }
+  };
 
   const load = () => {
     setLoading(true);
@@ -157,23 +188,21 @@ export default function PneumatiquePage() {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setResult(null);
-    try {
-      const res = await pneumatiqueService.importExcel(file);
-      setResult(res);
-      toast.success(`Import terminé : ${res.created} créés, ${res.updated} mis à jour`);
-      load();
-      pneumatiqueService.filtres().then(setFiltres).catch(() => {});
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
-    } finally {
-      setImporting(false);
-    }
-  };
+  const [showExport, setShowExport] = useState(false);
+  const exportCols: ExportColDef<Pneumatique>[] = [
+    { key: "fournisseur",      header: "Fournisseur",        value: r => r.fournisseur ?? "" },
+    { key: "type_location",    header: "Type location",      value: r => r.type_location ?? "" },
+    { key: "immatriculation",  header: "Immatriculation",    value: r => r.immatriculation ?? "" },
+    { key: "chauffeur",        header: "Chauffeur",          value: r => r.chauffeur ?? "" },
+    { key: "kilometrage",      header: "Kilométrage",        value: r => r.kilometrage ?? "" },
+    { key: "nb_pneus",         header: "N° Pneus",           value: r => r.nb_pneus ?? "" },
+    { key: "ref_pneu",         header: "Réf. Pneu",          value: r => r.ref_pneu ?? "" },
+    { key: "etat",             header: "État",               value: r => r.etat ?? "" },
+    { key: "snc",              header: "SNC",                value: r => r.snc ?? "" },
+    { key: "zone_intervention",header: "Zone intervention",  value: r => r.zone_intervention ?? "" },
+    { key: "date_prevue",      header: "Date prévue",        value: r => r.date_prevue?.slice(0, 10) ?? "" },
+    { key: "commentaire",      header: "Commentaire",        value: r => r.commentaire ?? "" },
+  ];
 
   const filteredItems = items.filter(p => {
     const q = search.trim().toLowerCase();
@@ -219,17 +248,15 @@ export default function PneumatiquePage() {
               </span>
             )}
           </button>
+          <button onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+            <Download size={15} /><span>Exporter</span>
+          </button>
           {!isViewer && (
-            <>
-              <button onClick={() => { setImportModal(true); setResult(null); }}
-                className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-                <Upload size={15} /><span>Importer</span>
-              </button>
-              <button onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-                <Plus size={15} /><span>Ajouter</span>
-              </button>
-            </>
+            <button onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+              <Plus size={15} /><span>Ajouter</span>
+            </button>
           )}
         </div>
       </div>
@@ -276,50 +303,70 @@ export default function PneumatiquePage() {
                   <th className="text-left px-4 py-2.5 font-semibold">Zone</th>
                   <th className="text-left px-4 py-2.5 font-semibold">Date prév.</th>
                   <th className="text-left px-4 py-2.5 font-semibold">Commentaire</th>
-                  {!isViewer && <th className="text-center px-4 py-2.5 font-semibold">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredItems.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{p.fournisseur || "—"}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
+                  <tr key={p.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(p)}>
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "fournisseur", "Fournisseur", "text")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{p.fournisseur || "—"}</span>
+                    </td>
+                    <td className="px-4 py-2.5 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "type_location", "Type location", "text")}>
                       {p.type_location ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-camublue-900/10 text-camublue-900">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-camublue-900/10 text-camublue-900 ${!isViewer ? "hover:ring-1 hover:ring-camublue-900 cursor-pointer" : ""}`}>
                           {p.type_location}
                         </span>
-                      ) : "—"}
+                      ) : <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>—</span>}
                     </td>
                     <td className="px-4 py-2.5 font-semibold text-gray-700 whitespace-nowrap">{p.immatriculation}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{p.chauffeur || "—"}</td>
-                    <td className="px-4 py-2.5 text-right text-gray-600 whitespace-nowrap">
-                      {p.kilometrage != null ? p.kilometrage.toLocaleString("fr-FR") : "—"}
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "chauffeur", "Chauffeur", "text")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{p.chauffeur || "—"}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-center text-gray-600">{p.nb_pneus ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap text-xs">{p.ref_pneu || "—"}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
+                    <td className="px-4 py-2.5 text-right text-gray-600 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "kilometrage", "Kilométrage", "number")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>
+                        {p.kilometrage != null ? p.kilometrage.toLocaleString("fr-FR") : "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center text-gray-600"
+                      onClick={e => openQuickEdit(e, p, "nb_pneus", "N° Pneus", "number")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{p.nb_pneus ?? "—"}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap text-xs"
+                      onClick={e => openQuickEdit(e, p, "ref_pneu", "Référence pneu", "text")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{p.ref_pneu || "—"}</span>
+                    </td>
+                    <td className="px-4 py-2.5 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "etat", "État", "text")}>
                       {p.etat ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${!isViewer ? "cursor-pointer hover:ring-1 hover:ring-offset-1" : ""}`}
                           style={{
                             background: ETAT_COLORS[p.etat] ? ETAT_COLORS[p.etat] + "22" : "#f3f4f6",
                             color: ETAT_COLORS[p.etat] ?? "#374151",
                           }}>
                           {p.etat}
                         </span>
-                      ) : "—"}
+                      ) : <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>—</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{p.snc || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{p.zone_intervention || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatDate(p.date_prevue)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 max-w-[180px] truncate">{p.commentaire || "—"}</td>
-                    {!isViewer && (
-                      <td className="px-4 py-2.5 text-center">
-                        <button onClick={() => setManageRow(p)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-lg text-xs font-semibold transition">
-                          <Settings size={13} /> Gérer
-                        </button>
-                      </td>
-                    )}
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "snc", "SNC", "text")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{p.snc || "—"}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "zone_intervention", "Zone d'intervention", "text")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{p.zone_intervention || "—"}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, p, "date_prevue", "Date prévue", "date")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{formatDate(p.date_prevue)}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600 max-w-[180px] truncate"
+                      onClick={e => openQuickEdit(e, p, "commentaire", "Commentaire", "textarea")}>
+                      <span className={!isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : ""}>{p.commentaire || "—"}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -328,6 +375,16 @@ export default function PneumatiquePage() {
         )}
         <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
       </div>
+
+      {showExport && (
+        <ExportModal
+          title="Exporter — Pneumatiques"
+          cols={exportCols}
+          filename="Pneumatiques"
+          onClose={() => setShowExport(false)}
+          fetchAll={async () => (await pneumatiqueService.getAll({ ...filters, page: 1, page_size: 9999 })).items}
+        />
+      )}
 
       {/* ══ Modal Graphiques ═══════════════════════════════════════════════ */}
       {showCharts && (() => {
@@ -553,47 +610,39 @@ export default function PneumatiquePage() {
         </div>
       )}
 
-      {/* ══ Modal Import ════════════════════════════════════════════════════ */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importing && setImportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><FileSpreadsheet size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Importer PNEUMATIQUE (Excel)</p>
-              </div>
-              <button onClick={() => !importing && setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
+      {/* ══ Quick Edit ══════════════════════════════════════════════════════ */}
+      {quickEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setQuickEdit(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-5 py-3.5 flex items-center justify-between">
+              <p className="text-white font-bold text-sm">{quickEdit.label}</p>
+              <button onClick={() => setQuickEdit(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
             </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">
-                Sélectionnez le fichier Excel contenant la feuille <strong>PNEUMATIQUE</strong>. Le fichier peut contenir plusieurs sections séparées par fournisseur (Ets MALEYE, AUTORENT/LASA, etc.) avec les colonnes : IMMA, CHAUFF, Kilométrage, N PNEUS, REF, ETAT, SNC/ZONE, DATE PREV, COMMENTAIRE.
-              </p>
-              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-8 cursor-pointer hover:border-camublue-900/40 transition">
-                <Upload size={24} className="text-camublue-900" />
-                <span className="text-sm font-semibold text-gray-700">{importing ? "Import en cours…" : "Choisir un fichier .xlsx"}</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing} onChange={handleFile} />
-              </label>
-              {result && (
-                <div className="rounded-xl border border-gray-100 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
-                    <CheckCircle2 size={16} /> {result.created} créés · {result.updated} mis à jour
-                  </div>
-                  {result.errors.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-amber-600 text-sm font-semibold">
-                        <AlertTriangle size={16} /> {result.errors.length} ligne(s) ignorée(s)
-                      </div>
-                      <ul className="text-xs text-gray-500 max-h-32 overflow-y-auto list-disc pl-5">
-                        {result.errors.slice(0, 20).map((e, i) => <li key={i}>Ligne {e.ligne} : {e.message}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-500">{quickEdit.item.immatriculation}</p>
+              {quickEdit.type === "textarea" ? (
+                <textarea
+                  rows={3}
+                  className="input-base w-full"
+                  value={quickValue}
+                  onChange={e => setQuickValue(e.target.value)}
+                  autoFocus
+                />
+              ) : (
+                <input
+                  type={quickEdit.type}
+                  className="input-base w-full"
+                  value={quickValue}
+                  onChange={e => setQuickValue(e.target.value)}
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter") handleQuickSave(); if (e.key === "Escape") setQuickEdit(null); }}
+                />
               )}
-              <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => setImportModal(false)} disabled={importing}
-                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">
-                  Fermer
+              <div className="flex gap-2">
+                <button onClick={() => setQuickEdit(null)} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">Annuler</button>
+                <button onClick={handleQuickSave} disabled={quickSaving}
+                  className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-60">
+                  {quickSaving ? "Enregistrement…" : "Enregistrer"}
                 </button>
               </div>
             </div>
@@ -620,18 +669,14 @@ export default function PneumatiquePage() {
                 <p><span className="font-semibold text-gray-700">Réf. :</span> {manageRow.ref_pneu || "—"}</p>
                 <p><span className="font-semibold text-gray-700">Date prév. :</span> {formatDate(manageRow.date_prevue)}</p>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <button onClick={() => { const p = manageRow; setManageRow(null); openEdit(p); }}
-                  className="flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Pencil size={14} /> Modifier
+                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Pencil size={14} /> Mise à jour
                 </button>
                 <button onClick={() => { const p = manageRow; setManageRow(null); handleDelete(p); }}
-                  className="flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
+                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
                   <Trash2 size={14} /> Supprimer
-                </button>
-                <button type="button" onClick={() => setManageRow(null)}
-                  className="border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
-                  Fermer
                 </button>
               </div>
             </div>

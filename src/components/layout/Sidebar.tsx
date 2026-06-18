@@ -8,14 +8,17 @@ import {
   User,
   Wrench,
   Database,
-  Table2,
   Navigation,
   FileText,
   ClipboardCheck,
   AlertTriangle,
   CircleDot,
   UploadCloud,
+  Upload,
+  Download,
   ShieldAlert,
+  ChevronRight,
+  Car,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,25 +29,111 @@ type NavItem = {
   icon: React.ReactNode;
 };
 
-const navItems: NavItem[] = [
-  { label: "Tableau de bord", path: "/dashboard",  icon: <LayoutDashboard size={20} /> },
-  { label: "Import global",   path: "/import-global", icon: <UploadCloud size={20} /> },
-  { label: "Données flottes", path: "/data-flottes", icon: <Database size={20} /> },
-  { label: "TCD Technique",   path: "/tcd-technique", icon: <Table2 size={20} /> },
-  { label: "Chauffeurs Pôles", path: "/chauffeurs-poles", icon: <Navigation size={20} /> },
-  { label: "Suivi des devis", path: "/suivi-devis", icon: <FileText size={20} /> },
-  { label: "Check-lists VL",  path: "/checklists-vl", icon: <ClipboardCheck size={20} /> },
-  { label: "Entretiens",      path: "/entretiens", icon: <Wrench size={20} /> },
-  { label: "Entretien BIS",   path: "/entretiens-bis", icon: <Wrench size={20} /> },
-  { label: "Suivi des Pannes", path: "/suivi-pannes", icon: <AlertTriangle size={20} /> },
-  { label: "Pneumatiques",    path: "/pneumatiques",  icon: <CircleDot size={20} /> },
-  { label: "Suivi sinistres", path: "/suivi-sinistres", icon: <ShieldAlert size={20} /> },
+type NavGroup = {
+  group: string;
+  icon: React.ReactNode;
+  children: NavItem[];
+};
+
+type NavEntry = NavItem | NavGroup;
+
+const isGroup = (e: NavEntry): e is NavGroup => "group" in e;
+
+const navEntries: NavEntry[] = [
+  { label: "Tableau de bord", path: "/dashboard",     icon: <LayoutDashboard size={20} /> },
+  {
+    group: "Import / Export",
+    icon: <UploadCloud size={20} />,
+    children: [
+      { label: "Import en masse", path: "/import-global", icon: <Upload size={16} /> },
+      { label: "Export en masse", path: "/export-global", icon: <Download size={16} /> },
+    ],
+  },
+  {
+    group: "Flotte & Véhicules",
+    icon: <Car size={20} />,
+    children: [
+      { label: "Données flottes",  path: "/data-flottes",    icon: <Database size={16} /> },
+      { label: "Chauffeurs Pôles", path: "/chauffeurs-poles", icon: <Navigation size={16} /> },
+      { label: "Check-lists VL",   path: "/checklists-vl",   icon: <ClipboardCheck size={16} /> },
+      { label: "Pneumatiques",     path: "/pneumatiques",    icon: <CircleDot size={16} /> },
+    ],
+  },
+  {
+    group: "Gestion Entretiens",
+    icon: <Wrench size={20} />,
+    children: [
+      { label: "Entretiens",    path: "/entretiens",     icon: <Wrench size={16} /> },
+      { label: "Entretien BIS", path: "/entretiens-bis", icon: <Wrench size={16} /> },
+    ],
+  },
+  {
+    group: "Gestion des suivis",
+    icon: <FileText size={20} />,
+    children: [
+      { label: "Suivi des devis",  path: "/suivi-devis",     icon: <FileText size={16} /> },
+      { label: "Suivi des Pannes", path: "/suivi-pannes",    icon: <AlertTriangle size={16} /> },
+      { label: "Suivi sinistres",  path: "/suivi-sinistres", icon: <ShieldAlert size={16} /> },
+    ],
+  },
 ];
 
 const adminNavItem: NavItem = { label: "Comptes utilisateurs", path: "/users", icon: <Users size={20} /> };
 
+function NavLink({ item, onClose }: { item: NavItem; onClose?: () => void }) {
+  const location = useLocation();
+  const isActive = location.pathname === item.path;
+  return (
+    <Link
+      to={item.path}
+      onClick={onClose}
+      className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-150 ${
+        isActive
+          ? "bg-camublue-900 text-white shadow-sm"
+          : "text-gray-700 hover:bg-camublue-900/10 hover:text-camublue-900"
+      }`}
+    >
+      <span className="shrink-0">{item.icon}</span>
+      <span className="truncate">{item.label}</span>
+    </Link>
+  );
+}
+
+function NavGroupComp({ group, onClose }: { group: NavGroup; onClose?: () => void }) {
+  const location = useLocation();
+  const isChildActive = group.children.some(c => location.pathname === c.path);
+  const [open, setOpen] = useState(isChildActive);
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-150 ${
+          isChildActive
+            ? "bg-camublue-900/10 text-camublue-900"
+            : "text-gray-700 hover:bg-camublue-900/10 hover:text-camublue-900"
+        }`}
+      >
+        <span className="shrink-0">{group.icon}</span>
+        <span className="flex-1 truncate text-left">{group.group}</span>
+        <ChevronRight
+          size={15}
+          className={`shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-camublue-900/20 pl-3">
+          {group.children.map(child => (
+            <NavLink key={child.path} item={child} onClose={onClose} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar() {
-  const location  = useLocation();
   const { user, logout } = useAuth();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -56,28 +145,8 @@ export default function Sidebar() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const items = user?.role === "ADMIN" ? [...navItems, adminNavItem] : navItems;
+  const entries: NavEntry[] = user?.role === "ADMIN" ? [...navEntries, adminNavItem] : navEntries;
 
-  // ── Nav item ──────────────────────────────────────────────────────────
-  const NavItemComp = ({ item, onClose }: { item: NavItem; onClose?: () => void }) => {
-    const isActive = location.pathname === item.path;
-    return (
-      <Link
-        to={item.path}
-        onClick={onClose}
-        className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-150 ${
-          isActive
-            ? "bg-camublue-900 text-white shadow-sm"
-            : "text-gray-700 hover:bg-camublue-900/10 hover:text-camublue-900"
-        }`}
-      >
-        <span className="shrink-0">{item.icon}</span>
-        <span className="truncate">{item.label}</span>
-      </Link>
-    );
-  };
-
-  // ── Bas du sidebar ────────────────────────────────────────────────────
   const SidebarFooter = () => (
     <div className="px-4 py-4 border-t border-gray-100">
       <button
@@ -95,10 +164,12 @@ export default function Sidebar() {
 
   const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
     <>
-      <nav className="flex-1 px-4 py-6 space-y-1">
-        {items.map(item => (
-          <NavItemComp key={item.path} item={item} onClose={onClose} />
-        ))}
+      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        {entries.map((entry, i) =>
+          isGroup(entry)
+            ? <NavGroupComp key={i} group={entry} onClose={onClose} />
+            : <NavLink key={entry.path} item={entry} onClose={onClose} />
+        )}
       </nav>
       <SidebarFooter />
     </>

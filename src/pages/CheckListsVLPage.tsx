@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Filter, Settings, Pencil, Trash2, ClipboardCheck, Search, ListOrdered, Tag, Layers, BarChart2 } from "lucide-react";
+import { Plus, X, Download, Filter, Settings, Pencil, Trash2, ClipboardCheck, Search, ListOrdered, Tag, Layers, BarChart2 } from "lucide-react";
+import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
   PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -10,7 +11,7 @@ import { KpiCard } from "@/components/charts";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { checklistVLService } from "@/services/api";
-import type { CheckListVL, FiltresCheckListVL, CheckListVLFilters, ImportCheckListVLResult } from "@/types";
+import type { CheckListVL, FiltresCheckListVL, CheckListVLFilters } from "@/types";
 
 const PAGE_SIZE = 10;
 
@@ -58,9 +59,6 @@ export default function CheckListsVLPage() {
   const [semainesForm, setSemainesForm] = useState<Record<string, string | null>>({});
   const [manageRow, setManageRow] = useState<CheckListVL | null>(null);
 
-  const [importModal, setImportModal] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<ImportCheckListVLResult | null>(null);
   const [search, setSearch] = useState("");
   const [showCharts, setShowCharts] = useState(false);
   const [allItems, setAllItems] = useState<CheckListVL[]>([]);
@@ -149,23 +147,40 @@ export default function CheckListsVLPage() {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setResult(null);
+  // Quick status edit
+  const [quickEdit, setQuickEdit] = useState<{ item: CheckListVL; semaine: string; current: string | null } | null>(null);
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const handleQuickSave = async (newStatut: string | null) => {
+    if (!quickEdit) return;
+    setQuickSaving(true);
     try {
-      const res = await checklistVLService.importExcel(file);
-      setResult(res);
-      toast.success(`Import terminé : ${res.created} créés, ${res.updated} mis à jour`);
+      await checklistVLService.update(quickEdit.item.id, {
+        brand: quickEdit.item.brand,
+        model: quickEdit.item.model,
+        plaque_immatriculation: quickEdit.item.plaque_immatriculation,
+        label: quickEdit.item.label,
+        car_group: quickEdit.item.car_group,
+        semaines: { ...(quickEdit.item.semaines ?? {}), [quickEdit.semaine]: newStatut },
+      });
+      toast.success("Statut mis à jour");
+      setQuickEdit(null);
       load();
-      checklistVLService.filtres().then(setFiltres).catch(() => {});
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
+      toast.error(err?.response?.data?.detail ?? "Erreur");
     } finally {
-      setImporting(false);
+      setQuickSaving(false);
     }
   };
+
+  const [showExport, setShowExport] = useState(false);
+  const exportCols: ExportColDef<CheckListVL>[] = [
+    { key: "brand",   header: "Brand",   value: r => r.brand ?? "" },
+    { key: "model",   header: "Model",   value: r => r.model ?? "" },
+    { key: "plaque",  header: "Plaque",  value: r => r.plaque_immatriculation ?? "" },
+    { key: "label",   header: "Label",   value: r => r.label ?? "" },
+    { key: "car_group", header: "Car Group", value: r => r.car_group ?? "" },
+  ];
 
   const filteredItems = items.filter(c => {
     const q = search.trim().toLowerCase();
@@ -202,17 +217,15 @@ export default function CheckListsVLPage() {
               </span>
             )}
           </button>
+          <button onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+            <Download size={15} /><span>Exporter</span>
+          </button>
           {!isViewer && (
-            <>
-              <button onClick={() => { setImportModal(true); setResult(null); }}
-                className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-                <Upload size={15} /><span>Importer</span>
-              </button>
-              <button onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-                <Plus size={15} /><span>Ajouter</span>
-              </button>
-            </>
+            <button onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+              <Plus size={15} /><span>Ajouter</span>
+            </button>
           )}
         </div>
       </div>
@@ -237,13 +250,6 @@ export default function CheckListsVLPage() {
         </div>
       </div>
 
-      {/* Légende */}
-      <div className="flex items-center gap-3 flex-wrap mb-4 text-xs">
-        {Object.entries(STATUT_STYLES).map(([statut, style]) => (
-          <span key={statut} className={`px-2 py-1 rounded font-bold ${style}`}>{statut}</span>
-        ))}
-      </div>
-
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
           <p className="text-sm text-gray-400 p-6 text-center">Chargement…</p>
@@ -262,30 +268,24 @@ export default function CheckListsVLPage() {
                   {semaines.map(s => (
                     <th key={s} className="text-center px-2 py-2.5 font-semibold whitespace-nowrap">{s.replace("SEMAINE ", "S")}</th>
                   ))}
-                  {!isViewer && <th className="text-center px-4 py-2.5 font-semibold sticky right-0 bg-camublue-900">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredItems.map(c => (
-                  <tr key={c.id} className="hover:bg-gray-50/60">
+                  <tr key={c.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(c)}>
                     <td className="px-4 py-2.5 font-semibold text-gray-700 whitespace-nowrap sticky left-0 bg-white">{c.brand || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{c.model || "—"}</td>
                     <td className="px-4 py-2.5 text-camublue-900 font-medium whitespace-nowrap">{c.plaque_immatriculation}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{c.label || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{c.car_group || "—"}</td>
                     {semaines.map(s => (
-                      <td key={s} className="px-1 py-2.5 text-center min-w-[64px]">
-                        <StatutBadge value={c.semaines?.[s] ?? null} />
+                      <td key={s} className="px-1 py-2.5 text-center min-w-[64px]"
+                        onClick={e => { e.stopPropagation(); if (!isViewer) setQuickEdit({ item: c, semaine: s, current: c.semaines?.[s] ?? null }); }}>
+                        <span className={!isViewer ? "cursor-pointer hover:opacity-75 transition" : ""}>
+                          <StatutBadge value={c.semaines?.[s] ?? null} />
+                        </span>
                       </td>
                     ))}
-                    {!isViewer && (
-                      <td className="px-4 py-2.5 text-center sticky right-0 bg-white">
-                        <button onClick={() => setManageRow(c)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-lg text-xs font-semibold transition">
-                          <Settings size={13} /> Gérer
-                        </button>
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -421,60 +421,6 @@ export default function CheckListsVLPage() {
         </div>
       )}
 
-      {/* ══ Modal Import ════════════════════════════════════════════ */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importing && setImportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><FileSpreadsheet size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Importer SUIVI DES CHECK LISTS VL (Excel)</p>
-              </div>
-              <button onClick={() => !importing && setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">
-                Sélectionnez le fichier Excel contenant la feuille <strong>SUIVI DES CHECK LISTS VL</strong> (colonnes : Brand, Model, Reg. №, Label, Car Group, SEMAINE 01..52).
-              </p>
-
-              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-8 cursor-pointer hover:border-camublue-900/40 transition">
-                <Upload size={24} className="text-camublue-900" />
-                <span className="text-sm font-semibold text-gray-700">{importing ? "Import en cours…" : "Choisir un fichier .xlsx"}</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing} onChange={handleFile} />
-              </label>
-
-              {result && (
-                <div className="rounded-xl border border-gray-100 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
-                    <CheckCircle2 size={16} /> {result.created} créés · {result.updated} mis à jour
-                  </div>
-                  {result.errors.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-amber-600 text-sm font-semibold">
-                        <AlertTriangle size={16} /> {result.errors.length} ligne(s) ignorée(s)
-                      </div>
-                      <ul className="text-xs text-gray-500 max-h-32 overflow-y-auto list-disc pl-5">
-                        {result.errors.slice(0, 20).map((e, i) => (
-                          <li key={i}>Ligne {e.ligne} : {e.message}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => setImportModal(false)} disabled={importing}
-                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ══ Modal Gérer ════════════════════════════════════════════ */}
       {manageRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setManageRow(null)}>
@@ -495,26 +441,88 @@ export default function CheckListsVLPage() {
                 <p><span className="font-semibold text-gray-700">Car Group :</span> {manageRow.car_group || "—"}</p>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <button
                   onClick={() => { const c = manageRow; setManageRow(null); openEdit(c); }}
-                  className="flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Pencil size={14} /> Modifier
+                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Pencil size={14} /> Mise à jour
                 </button>
                 <button
                   onClick={() => { const c = manageRow; setManageRow(null); handleDelete(c); }}
-                  className="flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
+                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
                   <Trash2 size={14} /> Supprimer
-                </button>
-                <button type="button" onClick={() => setManageRow(null)}
-                  className="border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
-                  Fermer
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {/* ══ Modal Quick Edit Statut ═══════════════════════════════════════ */}
+      {quickEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setQuickEdit(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                  <ClipboardCheck size={18} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm">{quickEdit.semaine.replace("SEMAINE ", "S")}</p>
+                  <p className="text-white/70 text-xs">{quickEdit.item.plaque_immatriculation} — {quickEdit.item.brand ?? ""} {quickEdit.item.model ?? ""}</p>
+                </div>
+              </div>
+              <button onClick={() => setQuickEdit(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-gray-500 mb-1">Sélectionnez le statut pour cette semaine :</p>
+              <div className="grid grid-cols-2 gap-2">
+                {statuts.map(st => {
+                  const style = STATUT_STYLES[st] ?? "bg-gray-200 text-gray-700";
+                  const isActive = quickEdit.current === st;
+                  return (
+                    <button
+                      key={st}
+                      disabled={quickSaving}
+                      onClick={() => handleQuickSave(st)}
+                      className={`flex items-center justify-center px-3 py-2.5 rounded-xl text-sm font-bold transition ${style} ${isActive ? "ring-2 ring-offset-2 ring-camublue-900 scale-105" : "opacity-80 hover:opacity-100 hover:scale-105"} disabled:opacity-50`}
+                    >
+                      {isActive && <span className="mr-1.5">✓</span>}{st}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {quickEdit.current && (
+                <button
+                  disabled={quickSaving}
+                  onClick={() => handleQuickSave(null)}
+                  className="w-full mt-1 border border-gray-200 rounded-xl py-2 text-sm text-gray-500 hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  Effacer le statut
+                </button>
+              )}
+
+              {quickSaving && (
+                <p className="text-center text-xs text-gray-400 animate-pulse">Enregistrement…</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showExport && (
+        <ExportModal
+          title="Exporter — Check-Lists VL"
+          cols={exportCols}
+          filename="CheckLists_VL"
+          onClose={() => setShowExport(false)}
+          fetchAll={async () => (await checklistVLService.getAll({ ...filters, page: 1, page_size: 9999 })).items}
+        />
+      )}
+
       {/* ══ Modal Graphiques ══════════════════════════════════════════════ */}
       {showCharts && (() => {
         const STATUT_COLORS: Record<string, string> = {

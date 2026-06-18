@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X, Wrench, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Settings, Search, AlertOctagon, ShieldCheck, BarChart2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Wrench, Download, Settings, Search, AlertOctagon, ShieldCheck, AlertTriangle, BarChart2 } from "lucide-react";
+import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
   PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -10,7 +11,7 @@ import { KpiCard } from "@/components/charts";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { entretienService } from "@/services/api";
-import type { EntretienVehicule, ImportEntretiensResult } from "@/types";
+import type { EntretienVehicule } from "@/types";
 
 const PAGE_SIZE = 10;
 
@@ -28,9 +29,6 @@ export default function EntretiensPage() {
   const [editing, setEditing] = useState<EntretienVehicule | null>(null);
   const [form, setForm] = useState<Partial<EntretienVehicule>>(EMPTY);
 
-  const [importModal, setImportModal] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<ImportEntretiensResult | null>(null);
   const [page, setPage] = useState(1);
   const [manageRow, setManageRow] = useState<EntretienVehicule | null>(null);
   const [search, setSearch] = useState("");
@@ -93,22 +91,64 @@ export default function EntretiensPage() {
     }
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setResult(null);
+  // Quick cell edit
+  const [quickEdit, setQuickEdit] = useState<{
+    entry: EntretienVehicule;
+    field: "palier" | "reste";
+    palierKm?: number;
+    label: string;
+    current: number | null;
+  } | null>(null);
+  const [quickValue, setQuickValue] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const openQuickEdit = (
+    e: React.MouseEvent,
+    entry: EntretienVehicule,
+    field: "palier" | "reste",
+    label: string,
+    current: number | null,
+    palierKm?: number,
+  ) => {
+    e.stopPropagation();
+    if (isViewer) return;
+    setQuickEdit({ entry, field, palierKm, label, current });
+    setQuickValue(current != null ? String(current) : "");
+  };
+
+  const handleQuickSave = async () => {
+    if (!quickEdit) return;
+    setQuickSaving(true);
+    const numVal = quickValue === "" ? null : Number(quickValue);
     try {
-      const res = await entretienService.importExcel(file);
-      setResult(res);
-      toast.success(`Import terminé : ${res.created} créés, ${res.updated} mis à jour`);
+      const { entry, field, palierKm } = quickEdit;
+      const payload: Partial<EntretienVehicule> = {
+        ...entry,
+        paliers: field === "palier" && palierKm != null
+          ? { ...(entry.paliers ?? {}), [String(palierKm)]: numVal }
+          : entry.paliers,
+        reste: field === "reste" ? numVal : entry.reste,
+      };
+      await entretienService.update(entry.id, payload);
+      toast.success("Valeur mise à jour");
+      setQuickEdit(null);
       load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
+      toast.error(err?.response?.data?.detail ?? "Erreur");
     } finally {
-      setImporting(false);
+      setQuickSaving(false);
     }
   };
+
+  const [showExport, setShowExport] = useState(false);
+  const exportCols: ExportColDef<EntretienVehicule>[] = [
+    { key: "type_location",        header: "Type location", value: r => r.type_location ?? "" },
+    { key: "fournisseur",          header: "Fournisseur",   value: r => r.fournisseur ?? "" },
+    { key: "type_vehicule",        header: "Type véhicule", value: r => r.type_vehicule ?? "" },
+    { key: "plaque_immatriculation", header: "Plaque",      value: r => r.plaque_immatriculation ?? "" },
+    { key: "nom_chauffeur",        header: "Chauffeur",     value: r => r.nom_chauffeur ?? "" },
+    { key: "reste",                header: "Reste (km)",    value: r => r.reste ?? "" },
+  ];
 
   const setPalierValue = (km: number, value: string) => {
     setForm(f => ({
@@ -129,18 +169,16 @@ export default function EntretiensPage() {
             className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
             <BarChart2 size={15} /><span>Voir graphiques</span>
           </button>
-        {!isViewer && (
-          <>
-            <button onClick={() => { setImportModal(true); setResult(null); }}
-              className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-              <Upload size={15} /><span>Importer (Excel)</span>
-            </button>
+          <button onClick={() => setShowExport(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+            <Download size={15} /><span>Exporter</span>
+          </button>
+          {!isViewer && (
             <button onClick={openCreate}
               className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
               <Plus size={15} /><span>Ajouter</span>
             </button>
-          </>
-        )}
+          )}
         </div>
       </div>
 
@@ -183,7 +221,6 @@ export default function EntretiensPage() {
                     <th key={km} className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">{km.toLocaleString("fr-FR")}</th>
                   ))}
                   <th className="text-right px-4 py-2.5 font-semibold whitespace-nowrap">Reste</th>
-                  {!isViewer && <th className="text-center px-4 py-2.5 font-semibold">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -195,7 +232,7 @@ export default function EntretiensPage() {
                     reste <= 7500 ? "bg-amber-100 text-amber-700" :
                     "bg-emerald-100 text-emerald-700";
                   return (
-                  <tr key={e.id} className="hover:bg-gray-50/60">
+                  <tr key={e.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(e)}>
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       {e.type_location ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{e.type_location}</span>
@@ -210,30 +247,24 @@ export default function EntretiensPage() {
                     {paliers.map(km => {
                       const v = e.paliers?.[String(km)];
                       return (
-                        <td key={km} className="px-1 py-1 text-right whitespace-nowrap">
+                        <td key={km} className="px-1 py-1 text-right whitespace-nowrap"
+                          onClick={ev => openQuickEdit(ev, e, "palier", `Palier ${km.toLocaleString("fr-FR")} km`, v != null ? Number(v) : null, km)}>
                           {v != null ? (
-                            <span className="inline-block w-full px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 font-medium">
+                            <span className={`inline-block w-full px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 font-medium ${!isViewer ? "cursor-pointer hover:ring-2 hover:ring-emerald-400 transition" : ""}`}>
                               {Number(v).toLocaleString("fr-FR")}
                             </span>
                           ) : (
-                            <span className="inline-block w-full px-2 py-1 rounded-md bg-gray-50 text-gray-300">—</span>
+                            <span className={`inline-block w-full px-2 py-1 rounded-md bg-gray-50 text-gray-300 ${!isViewer ? "cursor-pointer hover:bg-gray-100 hover:text-gray-400 transition" : ""}`}>—</span>
                           )}
                         </td>
                       );
                     })}
-                    <td className="px-1 py-1 text-right whitespace-nowrap">
-                      <span className={`inline-block w-full px-2 py-1 rounded-md font-semibold ${resteClass}`}>
+                    <td className="px-1 py-1 text-right whitespace-nowrap"
+                      onClick={ev => openQuickEdit(ev, e, "reste", "Reste (km)", reste)}>
+                      <span className={`inline-block w-full px-2 py-1 rounded-md font-semibold ${resteClass} ${!isViewer ? "cursor-pointer hover:opacity-75 transition" : ""}`}>
                         {reste != null ? reste.toLocaleString("fr-FR") : "—"}
                       </span>
                     </td>
-                    {!isViewer && (
-                      <td className="px-4 py-2.5 text-center">
-                        <button onClick={() => setManageRow(e)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-lg text-xs font-semibold transition">
-                          <Settings size={13} /> Gérer
-                        </button>
-                      </td>
-                    )}
                   </tr>
                   );
                 })}
@@ -296,61 +327,6 @@ export default function EntretiensPage() {
         </div>
       )}
 
-      {/* ══ Modal Import ════════════════════════════════════════════ */}
-      {importModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importing && setImportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><FileSpreadsheet size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Importer les entretiens (Excel)</p>
-              </div>
-              <button onClick={() => !importing && setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">
-                Sélectionnez le fichier Excel contenant la feuille <strong>ENTRTIENS</strong>.
-                Les véhicules existants (même plaque) sont mis à jour.
-              </p>
-
-              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-8 cursor-pointer hover:border-camublue-900/40 transition">
-                <Upload size={24} className="text-camublue-900" />
-                <span className="text-sm font-semibold text-gray-700">{importing ? "Import en cours…" : "Choisir un fichier .xlsx"}</span>
-                <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing} onChange={handleFile} />
-              </label>
-
-              {result && (
-                <div className="rounded-xl border border-gray-100 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-600 text-sm font-semibold">
-                    <CheckCircle2 size={16} /> {result.created} créés · {result.updated} mis à jour
-                  </div>
-                  {result.errors.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-amber-600 text-sm font-semibold">
-                        <AlertTriangle size={16} /> {result.errors.length} ligne(s) ignorée(s)
-                      </div>
-                      <ul className="text-xs text-gray-500 max-h-32 overflow-y-auto list-disc pl-5">
-                        {result.errors.slice(0, 20).map((e, i) => (
-                          <li key={i}>Ligne {e.ligne} : {e.message}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => setImportModal(false)} disabled={importing}
-                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ══ Modal Gérer ════════════════════════════════════════════ */}
       {manageRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setManageRow(null)}>
@@ -371,26 +347,78 @@ export default function EntretiensPage() {
                 <p><span className="font-semibold text-gray-700">Chauffeur :</span> {manageRow.nom_chauffeur || "—"}</p>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
                 <button
                   onClick={() => { const e = manageRow; setManageRow(null); openEdit(e); }}
-                  className="flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Pencil size={14} /> Modifier
+                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Pencil size={14} /> Mise à jour
                 </button>
                 <button
                   onClick={() => { const e = manageRow; setManageRow(null); handleDelete(e); }}
-                  className="flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
+                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
                   <Trash2 size={14} /> Supprimer
-                </button>
-                <button type="button" onClick={() => setManageRow(null)}
-                  className="border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
-                  Fermer
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {/* ══ Modal Quick Edit ══════════════════════════════════════════════ */}
+      {quickEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setQuickEdit(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Wrench size={18} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm">{quickEdit.label}</p>
+                  <p className="text-white/70 text-xs">{quickEdit.entry.plaque_immatriculation}</p>
+                </div>
+              </div>
+              <button onClick={() => setQuickEdit(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Valeur (km)</label>
+                <input
+                  type="number"
+                  autoFocus
+                  value={quickValue}
+                  onChange={e => setQuickValue(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleQuickSave(); if (e.key === "Escape") setQuickEdit(null); }}
+                  placeholder="ex: 45000"
+                  className="input-base w-full text-right text-lg font-semibold"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setQuickEdit(null)}
+                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
+                  Annuler
+                </button>
+                <button onClick={handleQuickSave} disabled={quickSaving}
+                  className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-50">
+                  {quickSaving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showExport && (
+        <ExportModal
+          title="Exporter — Entretiens"
+          cols={exportCols}
+          filename="Entretiens"
+          onClose={() => setShowExport(false)}
+          fetchAll={async () => entretiens}
+        />
+      )}
+
       {/* ══ Modal Graphiques ══════════════════════════════════════════════ */}
       {showCharts && (() => {
         const COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
