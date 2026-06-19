@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, X, Wrench, Download, Settings, Search, AlertOctagon, ShieldCheck, AlertTriangle, BarChart2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Wrench, Download, Filter, Settings, Search, ShieldCheck, AlertTriangle, BarChart2 } from "lucide-react";
 import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
-  PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
+  Cell, Tooltip as RTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
 import toast from "react-hot-toast";
@@ -18,7 +18,7 @@ const PAGE_SIZE = 10;
 
 const EMPTY: Partial<EntretienVehicule> = {
   type_location: "", fournisseur: "", type_vehicule: "", plaque_immatriculation: "",
-  nom_chauffeur: "", paliers: {}, reste: null,
+  nom_chauffeur: "", paliers: {},
 };
 
 export default function EntretiensPage() {
@@ -36,6 +36,11 @@ export default function EntretiensPage() {
   const [chartFilter, setChartFilter] = useState<ChartFilter>(CHART_FILTER_EMPTY);
   const [showCharts, setShowCharts] = useState(false);
 
+  // Filtres client-side
+  const [filterModal, setFilterModal] = useState(false);
+  const [filters, setFilters] = useState<{ type_location?: string; fournisseur?: string; type_vehicule?: string }>({});
+  const [draft, setDraft] = useState<typeof filters>({});
+
   const load = () => {
     setLoading(true);
     Promise.all([entretienService.getAll(), entretienService.getPaliers()])
@@ -46,7 +51,20 @@ export default function EntretiensPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Options dérivées des données
+  const optTypes     = [...new Set(entretiens.map(e => e.type_location).filter(Boolean))] as string[];
+  const optFourn     = [...new Set(entretiens.map(e => e.fournisseur).filter(Boolean))] as string[];
+  const optVehicules = [...new Set(entretiens.map(e => e.type_vehicule).filter(Boolean))] as string[];
+
+  const hasFilters = Object.keys(filters).length > 0;
+  const openFilterModal = () => { setDraft(filters); setFilterModal(true); };
+  const applyFilters  = () => { setFilters(draft); setFilterModal(false); };
+  const resetFilters  = () => { setDraft({}); setFilters({}); setFilterModal(false); };
+
   const filtered = entretiens.filter(e => {
+    if (filters.type_location && e.type_location !== filters.type_location) return false;
+    if (filters.fournisseur   && e.fournisseur   !== filters.fournisseur)   return false;
+    if (filters.type_vehicule && e.type_vehicule !== filters.type_vehicule) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return [e.plaque_immatriculation, e.nom_chauffeur, e.fournisseur, e.type_vehicule, e.type_location]
@@ -56,11 +74,8 @@ export default function EntretiensPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pagedEntretiens = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, filters]);
 
-  const enRetard = entretiens.filter(e => e.reste != null && Number(e.reste) < 0).length;
-  const aSurveiller = entretiens.filter(e => e.reste != null && Number(e.reste) >= 0 && Number(e.reste) <= 7500).length;
-  const aJour = entretiens.filter(e => e.reste != null && Number(e.reste) > 7500).length;
 
   const openCharts = () => setShowCharts(true);
 
@@ -98,7 +113,7 @@ export default function EntretiensPage() {
   // Quick cell edit
   const [quickEdit, setQuickEdit] = useState<{
     entry: EntretienVehicule;
-    field: "palier" | "reste";
+    field: "palier";
     palierKm?: number;
     label: string;
     current: number | null;
@@ -109,7 +124,7 @@ export default function EntretiensPage() {
   const openQuickEdit = (
     e: React.MouseEvent,
     entry: EntretienVehicule,
-    field: "palier" | "reste",
+    field: "palier",
     label: string,
     current: number | null,
     palierKm?: number,
@@ -128,10 +143,9 @@ export default function EntretiensPage() {
       const { entry, field, palierKm } = quickEdit;
       const payload: Partial<EntretienVehicule> = {
         ...entry,
-        paliers: field === "palier" && palierKm != null
+        paliers: palierKm != null
           ? { ...(entry.paliers ?? {}), [String(palierKm)]: numVal }
           : entry.paliers,
-        reste: field === "reste" ? numVal : entry.reste,
       };
       await entretienService.update(entry.id, payload);
       toast.success("Valeur mise à jour");
@@ -151,7 +165,6 @@ export default function EntretiensPage() {
     { key: "type_vehicule",        header: "Type véhicule", value: r => r.type_vehicule ?? "" },
     { key: "plaque_immatriculation", header: "Plaque",      value: r => r.plaque_immatriculation ?? "" },
     { key: "nom_chauffeur",        header: "Chauffeur",     value: r => r.nom_chauffeur ?? "" },
-    { key: "reste",                header: "Reste (km)",    value: r => r.reste ?? "" },
   ];
 
   const setPalierValue = (km: number, value: string) => {
@@ -174,6 +187,15 @@ export default function EntretiensPage() {
               className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
               <BarChart2 size={15} /><span>Voir graphiques</span>
             </button>
+            <button onClick={openFilterModal}
+              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm relative">
+              <Filter size={15} /><span>Filtres</span>
+              {hasFilters && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-bold">
+                  {Object.keys(filters).length}
+                </span>
+              )}
+            </button>
             <button onClick={() => setShowExport(true)}
               className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
               <Download size={15} /><span>Exporter</span>
@@ -188,11 +210,10 @@ export default function EntretiensPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
         <KpiCard label="Véhicules suivis" value={entretiens.length} icon={<Wrench size={20} />} bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="En retard" value={enRetard} icon={<AlertOctagon size={20} />} bg="bg-red-100" text="text-red-600" />
-        <KpiCard label="À surveiller (≤ 7 500 km)" value={aSurveiller} icon={<AlertTriangle size={20} />} bg="bg-amber-100" text="text-amber-600" />
-        <KpiCard label="À jour" value={aJour} icon={<ShieldCheck size={20} />} bg="bg-emerald-100" text="text-emerald-600" />
+        <KpiCard label="Fournisseurs" value={[...new Set(entretiens.map(e => e.fournisseur).filter(Boolean))].length} icon={<ShieldCheck size={20} />} bg="bg-emerald-100" text="text-emerald-600" />
+        <KpiCard label="Types de véhicule" value={[...new Set(entretiens.map(e => e.type_vehicule).filter(Boolean))].length} icon={<AlertTriangle size={20} />} bg="bg-amber-100" text="text-amber-600" />
       </div>
 
       <div className="flex justify-center mb-6">
@@ -226,17 +247,10 @@ export default function EntretiensPage() {
                   {paliers.map(km => (
                     <th key={km} className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">{km.toLocaleString("fr-FR")}</th>
                   ))}
-                  <th className="text-right px-4 py-2.5 font-semibold whitespace-nowrap">Reste</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {pagedEntretiens.map(e => {
-                  const reste = e.reste != null ? Number(e.reste) : null;
-                  const resteClass =
-                    reste == null ? "text-gray-600" :
-                    reste < 0 ? "bg-red-100 text-red-700" :
-                    reste <= 7500 ? "bg-amber-100 text-amber-700" :
-                    "bg-emerald-100 text-emerald-700";
                   return (
                   <tr key={e.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(e)}>
                     <td className="px-4 py-2.5 whitespace-nowrap">
@@ -265,12 +279,6 @@ export default function EntretiensPage() {
                         </td>
                       );
                     })}
-                    <td className="px-1 py-1 text-right whitespace-nowrap"
-                      onClick={ev => openQuickEdit(ev, e, "reste", "Reste (km)", reste)}>
-                      <span className={`inline-block w-full px-2 py-1 rounded-md font-semibold ${resteClass} ${!isViewer ? "cursor-pointer hover:opacity-75 transition" : ""}`}>
-                        {reste != null ? reste.toLocaleString("fr-FR") : "—"}
-                      </span>
-                    </td>
                   </tr>
                   );
                 })}
@@ -300,7 +308,6 @@ export default function EntretiensPage() {
                 <Field label="Fournisseur" value={form.fournisseur ?? ""} onChange={v => setForm(f => ({ ...f, fournisseur: v }))} />
                 <Field label="Statut" value={form.type_location ?? ""} onChange={v => setForm(f => ({ ...f, type_location: v }))} />
                 <Field label="Chauffeur" value={form.nom_chauffeur ?? ""} onChange={v => setForm(f => ({ ...f, nom_chauffeur: v }))} />
-                <Field label="Reste (km)" value={form.reste != null ? String(form.reste) : ""} onChange={v => setForm(f => ({ ...f, reste: v === "" ? null : Number(v) }))} type="number" />
               </div>
 
               <div>
@@ -329,6 +336,48 @@ export default function EntretiensPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Modal Filtres ══════════════════════════════════════════ */}
+      {filterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFilterModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between sticky top-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><Filter size={18} className="text-white" /></div>
+                <p className="text-white font-bold text-sm">Filtres</p>
+              </div>
+              <button onClick={() => setFilterModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Statut (type location)</label>
+                <select value={draft.type_location ?? ""} onChange={e => setDraft(d => ({ ...d, type_location: e.target.value || undefined }))} className="input-base">
+                  <option value="">Tous</option>
+                  {optTypes.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Fournisseur</label>
+                <select value={draft.fournisseur ?? ""} onChange={e => setDraft(d => ({ ...d, fournisseur: e.target.value || undefined }))} className="input-base">
+                  <option value="">Tous les fournisseurs</option>
+                  {optFourn.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Type de véhicule</label>
+                <select value={draft.type_vehicule ?? ""} onChange={e => setDraft(d => ({ ...d, type_vehicule: e.target.value || undefined }))} className="input-base">
+                  <option value="">Tous les types</option>
+                  {optVehicules.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button type="button" onClick={resetFilters} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">Réinitialiser</button>
+                <button type="button" onClick={applyFilters} className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">Appliquer</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -429,12 +478,6 @@ export default function EntretiensPage() {
       {showCharts && (() => {
         const COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
 
-        // Répartition statut kilométrique
-        const statutData = [
-          { name: "En retard",    value: enRetard,    color: "#ef4444" },
-          { name: "À surveiller", value: aSurveiller, color: "#f59e0b" },
-          { name: "À jour",       value: aJour,       color: "#10b981" },
-        ].filter(d => d.value > 0);
 
         // Par fournisseur
         const parFourn: Record<string, number> = {};
@@ -451,12 +494,6 @@ export default function EntretiensPage() {
           .slice(0, 8)
           .map(([name, value]) => ({ name, value }));
 
-        // Top 10 km restants (les plus urgents)
-        const resteData = [...entretiens]
-          .filter(e => e.reste != null)
-          .sort((a, b) => Number(a.reste) - Number(b.reste))
-          .slice(0, 10)
-          .map(e => ({ name: e.plaque_immatriculation, value: Number(e.reste) }));
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCharts(false)}>
@@ -477,25 +514,7 @@ export default function EntretiensPage() {
 
               {/* Body */}
               <div className="overflow-y-auto p-6 space-y-8">
-                {/* Row 1 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Donut statut km */}
-                  <div className="bg-gray-50 rounded-2xl p-4">
-                    <p className="text-sm font-bold text-camublue-900 mb-4">Répartition par statut kilométrique</p>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie data={statutData} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                          innerRadius={55} outerRadius={85} paddingAngle={3}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                          labelLine={false}>
-                          {statutData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                        </Pie>
-                        <RTooltip formatter={(v: number) => [`${v} véhicule(s)`, ""]} />
-                        <Legend iconType="circle" iconSize={10} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-
                   {/* Par type de véhicule */}
                   <div className="bg-gray-50 rounded-2xl p-4">
                     <p className="text-sm font-bold text-camublue-900 mb-4">Véhicules par type</p>
@@ -511,10 +530,6 @@ export default function EntretiensPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                </div>
-
-                {/* Row 2 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Par fournisseur */}
                   <div className="bg-gray-50 rounded-2xl p-4">
                     <p className="text-sm font-bold text-camublue-900 mb-4">Véhicules par fournisseur</p>
@@ -531,24 +546,6 @@ export default function EntretiensPage() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Top 10 km restants urgents */}
-                  <div className="bg-gray-50 rounded-2xl p-4">
-                    <p className="text-sm font-bold text-camublue-900 mb-1">Km restants — 10 plus urgents</p>
-                    <p className="text-xs text-gray-400 mb-4">Les valeurs négatives indiquent un retard d'entretien</p>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={resteData} layout="vertical" margin={{ left: 8, right: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => v.toLocaleString("fr-FR")} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
-                        <RTooltip formatter={(v: number) => [`${v.toLocaleString("fr-FR")} km`, ""]} />
-                        <Bar dataKey="value" name="Reste km" radius={[0, 4, 4, 0]}>
-                          {resteData.map((d, i) => (
-                            <Cell key={i} fill={d.value < 0 ? "#ef4444" : d.value <= 7500 ? "#f59e0b" : "#10b981"} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
                 </div>
               </div>
 

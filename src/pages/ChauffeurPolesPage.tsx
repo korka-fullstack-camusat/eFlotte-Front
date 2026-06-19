@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Download, Filter, Settings, Pencil, Trash2, Car, Search, ListOrdered, Users, MapPin, BarChart2 } from "lucide-react";
+import { Plus, X, Download, Filter, Pencil, Trash2, Car, Search, ListOrdered, Users, MapPin, BarChart2 } from "lucide-react";
 import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import toast from "react-hot-toast";
@@ -18,7 +18,7 @@ const EMPTY = {
   projet: "", destination: "", date_depart: "", date_retour: "", commentaires: "",
 };
 
-function formatDate(iso: string | null): string {
+function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const [annee, mois, jour] = iso.split("-");
   return `${jour}/${mois}/${annee}`;
@@ -36,6 +36,8 @@ function topN(items: MissionChauffeur[], key: keyof MissionChauffeur, n = 10) {
     .map(([label, value]) => ({ label, value }));
 }
 
+type QuickEditField = "date" | "immatriculation" | "chauffeur" | "demandeur" | "telephone" | "projet" | "destination" | "date_depart" | "date_retour" | "commentaires";
+
 export default function ChauffeurPolesPage() {
   const { isViewer } = useAuth();
   const [items, setItems] = useState<MissionChauffeur[]>([]);
@@ -51,17 +53,56 @@ export default function ChauffeurPolesPage() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<MissionChauffeur | null>(null);
   const [form, setForm] = useState(EMPTY);
-  const [manageRow, setManageRow] = useState<MissionChauffeur | null>(null);
 
   const [search, setSearch] = useState("");
   const [showExport, setShowExport] = useState(false);
 
   const [chartFilter, setChartFilter] = useState<ChartFilter>(CHART_FILTER_EMPTY);
-
   const [showCharts, setShowCharts] = useState(false);
   const [allItems, setAllItems] = useState<MissionChauffeur[]>([]);
   const [rawChartItems, setRawChartItems] = useState<MissionChauffeur[]>([]);
   const [loadingCharts, setLoadingCharts] = useState(false);
+
+  // Quick edit
+  const [manageRow, setManageRow] = useState<MissionChauffeur | null>(null);
+
+  const [quickEdit, setQuickEdit] = useState<{
+    item: MissionChauffeur; field: QuickEditField; label: string;
+    type: "text" | "date" | "textarea";
+  } | null>(null);
+  const [quickValue, setQuickValue] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const openQuickEdit = (
+    e: React.MouseEvent,
+    item: MissionChauffeur,
+    field: QuickEditField,
+    label: string,
+    type: "text" | "date" | "textarea" = "text",
+  ) => {
+    e.stopPropagation();
+    if (isViewer) return;
+    const current = item[field] != null ? String(item[field]).slice(0, 10) : "";
+    setQuickEdit({ item, field, label, type });
+    setQuickValue(current);
+  };
+
+  const handleQuickSave = async () => {
+    if (!quickEdit) return;
+    setQuickSaving(true);
+    try {
+      const { item, field } = quickEdit;
+      const val = quickValue.trim();
+      await missionChauffeurService.update(item.id, { [field]: val || null } as any);
+      toast.success("Mis à jour");
+      setQuickEdit(null);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur");
+    } finally {
+      setQuickSaving(false);
+    }
+  };
 
   const load = () => {
     setLoading(true);
@@ -162,16 +203,16 @@ export default function ChauffeurPolesPage() {
   };
 
   const exportCols: ExportColDef<MissionChauffeur>[] = [
-    { key: "date",          header: "Date",            value: r => r.date?.slice(0, 10) ?? "" },
-    { key: "immatriculation", header: "Immatriculation", value: r => r.immatriculation },
-    { key: "chauffeur",     header: "Chauffeur",       value: r => r.chauffeur ?? "" },
-    { key: "demandeur",     header: "Demandeur",       value: r => r.demandeur ?? "" },
-    { key: "telephone",     header: "Téléphone",       value: r => r.telephone ?? "" },
-    { key: "projet",        header: "Projet",          value: r => r.projet ?? "" },
-    { key: "destination",   header: "Destination",     value: r => r.destination ?? "" },
-    { key: "date_depart",   header: "Date départ",     value: r => r.date_depart?.slice(0, 10) ?? "" },
-    { key: "date_retour",   header: "Date retour",     value: r => r.date_retour?.slice(0, 10) ?? "" },
-    { key: "commentaires",  header: "Commentaires",    value: r => r.commentaires ?? "" },
+    { key: "date",           header: "Date",             value: r => r.date?.slice(0, 10) ?? "" },
+    { key: "immatriculation",header: "Immatriculation",  value: r => r.immatriculation },
+    { key: "chauffeur",      header: "Chauffeur",        value: r => r.chauffeur ?? "" },
+    { key: "demandeur",      header: "Demandeur",        value: r => r.demandeur ?? "" },
+    { key: "telephone",      header: "Téléphone",        value: r => r.telephone ?? "" },
+    { key: "projet",         header: "Projet",           value: r => r.projet ?? "" },
+    { key: "destination",    header: "Destination",      value: r => r.destination ?? "" },
+    { key: "date_depart",    header: "Date départ",      value: r => r.date_depart?.slice(0, 10) ?? "" },
+    { key: "date_retour",    header: "Date retour",      value: r => r.date_retour?.slice(0, 10) ?? "" },
+    { key: "commentaires",   header: "Commentaires",     value: r => r.commentaires ?? "" },
   ];
 
   const filteredItems = items.filter(m => {
@@ -182,6 +223,11 @@ export default function ChauffeurPolesPage() {
   });
 
   const COLORS = ["#1e3a5f","#2a5298","#3b6fc4","#5b8de0","#7aaee8","#9ec5f0","#b8d4f5","#d0e5fa","#e6f1fd","#f0f7ff"];
+  const truncTick = (v: string) => v.length > 14 ? v.slice(0, 13) + "…" : v;
+  const hBarHeight = (data: any[]) => Math.max(200, data.length * 32);
+
+  const editableTd = "cursor-pointer";
+  const editableSpan = !isViewer ? "hover:underline hover:text-camublue-900 cursor-pointer" : "";
 
   return (
     <AppLayout>
@@ -246,34 +292,64 @@ export default function ChauffeurPolesPage() {
           <p className="text-sm text-gray-400 p-6 text-center">Aucune donnée — importez le fichier Excel.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
               <thead className="bg-camublue-900 text-white text-xs uppercase">
                 <tr>
-                  <th className="text-left px-4 py-2.5 font-semibold">Date</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Imma</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Chauffeur</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Demandeur</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Téléphone</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Projet</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Destination</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Date départ</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Date retour</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Commentaires</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[8%]">Date</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Imma</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[10%]">Chauffeur</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[10%]">Demandeur</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Téléphone</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[10%]">Projet</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[12%]">Destination</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Date départ</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Date retour</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[14%]">Commentaires</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredItems.map(m => (
-                  <tr key={m.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(m)}>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatDate(m.date)}</td>
-                    <td className="px-4 py-2.5 font-semibold text-gray-700 whitespace-nowrap">{m.immatriculation}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{m.chauffeur || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{m.demandeur || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{m.telephone || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{m.projet || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{m.destination || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatDate(m.date_depart)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatDate(m.date_retour)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 max-w-xs truncate">{m.commentaires || "—"}</td>
+                  <tr key={m.id} className="hover:bg-gray-50/60">
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "date", "Date", "date")}>
+                      <span className={editableSpan}>{formatDate(m.date)}</span>
+                    </td>
+                    <td className="px-4 py-2.5 font-semibold text-gray-700 truncate cursor-pointer"
+                      onClick={() => setManageRow(m)}>
+                      <span className="hover:underline hover:text-camublue-900">{m.immatriculation}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "chauffeur", "Chauffeur")}>
+                      <span className={editableSpan}>{m.chauffeur || "—"}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "demandeur", "Demandeur")}>
+                      <span className={editableSpan}>{m.demandeur || "—"}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "telephone", "Téléphone")}>
+                      <span className={editableSpan}>{m.telephone || "—"}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "projet", "Projet")}>
+                      <span className={editableSpan}>{m.projet || "—"}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "destination", "Destination")}>
+                      <span className={editableSpan}>{m.destination || "—"}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "date_depart", "Date départ", "date")}>
+                      <span className={editableSpan}>{formatDate(m.date_depart)}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "date_retour", "Date retour", "date")}>
+                      <span className={editableSpan}>{formatDate(m.date_retour)}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 max-w-xs truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "commentaires", "Commentaires", "textarea")}>
+                      <span className={editableSpan}>{m.commentaires || "—"}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -283,14 +359,92 @@ export default function ChauffeurPolesPage() {
         <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
       </div>
 
+      {/* ══ Modal Gérer (IMMA) ══════════════════════════════════════════════ */}
+      {manageRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setManageRow(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><Car size={18} className="text-white" /></div>
+                <p className="text-white font-bold text-sm">Gérer la mission</p>
+              </div>
+              <button onClick={() => setManageRow(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-sm space-y-1">
+                <p><span className="font-semibold text-gray-700">Plaque :</span> {manageRow.immatriculation}</p>
+                <p><span className="font-semibold text-gray-700">Date :</span> {formatDate(manageRow.date)}</p>
+                <p><span className="font-semibold text-gray-700">Chauffeur :</span> {manageRow.chauffeur || "—"}</p>
+                <p><span className="font-semibold text-gray-700">Destination :</span> {manageRow.destination || "—"}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { const m = manageRow; setManageRow(null); openEdit(m); }}
+                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Pencil size={14} /> Mise à jour
+                </button>
+                <button
+                  onClick={() => { const m = manageRow; setManageRow(null); handleDelete(m); }}
+                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
+                  <Trash2 size={14} /> Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Quick Edit ══════════════════════════════════════════════════════ */}
+      {quickEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setQuickEdit(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-5 py-3.5 flex items-center justify-between">
+              <p className="text-white font-bold text-sm">{quickEdit.label}</p>
+              <button onClick={() => setQuickEdit(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-500">{quickEdit.item.immatriculation} — {formatDate(quickEdit.item.date)}</p>
+              {quickEdit.type === "textarea" ? (
+                <textarea
+                  rows={3}
+                  className="input-base w-full"
+                  value={quickValue}
+                  onChange={e => setQuickValue(e.target.value)}
+                  autoFocus
+                />
+              ) : (
+                <input
+                  type={quickEdit.type}
+                  className="input-base w-full"
+                  value={quickValue}
+                  onChange={e => setQuickValue(e.target.value)}
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter") handleQuickSave(); if (e.key === "Escape") setQuickEdit(null); }}
+                />
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setQuickEdit(null)}
+                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
+                  Annuler
+                </button>
+                <button onClick={handleQuickSave} disabled={quickSaving}
+                  className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-60">
+                  {quickSaving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ Modal Graphiques ═══════════════════════════════════════════════ */}
       {showCharts && (() => {
         const chauffeurData = topN(allItems, "chauffeur");
         const projetData = topN(allItems, "projet");
         const immaData = topN(allItems, "immatriculation");
         const destData = topN(allItems, "destination");
-        const truncTick = (v: string) => v.length > 14 ? v.slice(0, 13) + "…" : v;
-        const hBarHeight = (data: any[]) => Math.max(200, data.length * 32);
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowCharts(false)}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
@@ -314,7 +468,6 @@ export default function ChauffeurPolesPage() {
                   <p className="text-sm text-gray-400 text-center py-16">Aucune donnée disponible.</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Missions par chauffeur */}
                     <div className="bg-gray-50 rounded-xl p-4">
                       <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Missions par chauffeur (top 10)</p>
                       <div style={{ height: hBarHeight(chauffeurData) }}>
@@ -324,17 +477,12 @@ export default function ChauffeurPolesPage() {
                             <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
                             <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10 }} tickFormatter={truncTick} />
                             <RTooltip formatter={(v: any) => [v, "Missions"]} labelFormatter={(l: string) => l} />
-                            <Bar dataKey="value" name="Missions" radius={[0, 4, 4, 0]}>
-                              {chauffeurData.map((_, i) => (
-                                <rect key={i} fill={COLORS[i % COLORS.length]} />
-                              ))}
-                            </Bar>
+                            <Bar dataKey="value" name="Missions" fill={COLORS[0]} radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
 
-                    {/* Missions par projet */}
                     <div className="bg-gray-50 rounded-xl p-4">
                       <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Missions par projet (top 10)</p>
                       <div style={{ height: hBarHeight(projetData) }}>
@@ -344,13 +492,12 @@ export default function ChauffeurPolesPage() {
                             <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
                             <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10 }} tickFormatter={truncTick} />
                             <RTooltip formatter={(v: any) => [v, "Missions"]} labelFormatter={(l: string) => l} />
-                            <Bar dataKey="value" name="Missions" fill="#2a5298" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="value" name="Missions" fill={COLORS[1]} radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
 
-                    {/* Missions par véhicule */}
                     <div className="bg-gray-50 rounded-xl p-4">
                       <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Missions par véhicule (top 10)</p>
                       <div style={{ height: hBarHeight(immaData) }}>
@@ -360,13 +507,12 @@ export default function ChauffeurPolesPage() {
                             <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
                             <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10 }} tickFormatter={truncTick} />
                             <RTooltip formatter={(v: any) => [v, "Missions"]} labelFormatter={(l: string) => l} />
-                            <Bar dataKey="value" name="Missions" fill="#3b6fc4" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="value" name="Missions" fill={COLORS[2]} radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
 
-                    {/* Missions par destination */}
                     <div className="bg-gray-50 rounded-xl p-4">
                       <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Missions par destination (top 10)</p>
                       <div style={{ height: hBarHeight(destData) }}>
@@ -376,7 +522,7 @@ export default function ChauffeurPolesPage() {
                             <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
                             <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10 }} tickFormatter={truncTick} />
                             <RTooltip formatter={(v: any) => [v, "Missions"]} labelFormatter={(l: string) => l} />
-                            <Bar dataKey="value" name="Missions" fill="#5b8de0" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="value" name="Missions" fill={COLORS[3]} radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -413,39 +559,26 @@ export default function ChauffeurPolesPage() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Plaque d'immatriculation</label>
                 <select value={draft.immatriculation ?? ""} onChange={e => setDraftFilter("immatriculation", e.target.value)} className="input-base">
                   <option value="">Toutes les plaques</option>
-                  {(filtres?.immatriculations ?? []).map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
+                  {(filtres?.immatriculations ?? []).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Chauffeur</label>
                 <select value={draft.chauffeur ?? ""} onChange={e => setDraftFilter("chauffeur", e.target.value)} className="input-base">
                   <option value="">Tous les chauffeurs</option>
-                  {(filtres?.chauffeurs ?? []).map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                  {(filtres?.chauffeurs ?? []).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Projet</label>
                 <select value={draft.projet ?? ""} onChange={e => setDraftFilter("projet", e.target.value)} className="input-base">
                   <option value="">Tous les projets</option>
-                  {(filtres?.projets ?? []).map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
+                  {(filtres?.projets ?? []).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
-
               <div className="flex gap-2 mt-2">
-                <button type="button" onClick={resetFilters} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
-                  Réinitialiser
-                </button>
-                <button type="button" onClick={applyFilters} className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  Appliquer
-                </button>
+                <button type="button" onClick={resetFilters} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">Réinitialiser</button>
+                <button type="button" onClick={applyFilters} className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">Appliquer</button>
               </div>
             </div>
           </div>
@@ -467,111 +600,49 @@ export default function ChauffeurPolesPage() {
             <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Date *</label>
-                <input type="date" required value={form.date}
-                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                  className="input-base" />
+                <input type="date" required value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Plaque d'immatriculation *</label>
-                <input type="text" required value={form.immatriculation}
-                  onChange={e => setForm(f => ({ ...f, immatriculation: e.target.value }))}
-                  className="input-base" />
+                <input type="text" required value={form.immatriculation} onChange={e => setForm(f => ({ ...f, immatriculation: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Chauffeur</label>
-                <input type="text" value={form.chauffeur}
-                  onChange={e => setForm(f => ({ ...f, chauffeur: e.target.value }))}
-                  className="input-base" />
+                <input type="text" value={form.chauffeur} onChange={e => setForm(f => ({ ...f, chauffeur: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Demandeur</label>
-                <input type="text" value={form.demandeur}
-                  onChange={e => setForm(f => ({ ...f, demandeur: e.target.value }))}
-                  className="input-base" />
+                <input type="text" value={form.demandeur} onChange={e => setForm(f => ({ ...f, demandeur: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Téléphone</label>
-                <input type="text" value={form.telephone}
-                  onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))}
-                  className="input-base" />
+                <input type="text" value={form.telephone} onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Projet</label>
-                <input type="text" value={form.projet}
-                  onChange={e => setForm(f => ({ ...f, projet: e.target.value }))}
-                  className="input-base" />
+                <input type="text" value={form.projet} onChange={e => setForm(f => ({ ...f, projet: e.target.value }))} className="input-base" />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Destination</label>
-                <input type="text" value={form.destination}
-                  onChange={e => setForm(f => ({ ...f, destination: e.target.value }))}
-                  className="input-base" />
+                <input type="text" value={form.destination} onChange={e => setForm(f => ({ ...f, destination: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Date départ</label>
-                <input type="date" value={form.date_depart}
-                  onChange={e => setForm(f => ({ ...f, date_depart: e.target.value }))}
-                  className="input-base" />
+                <input type="date" value={form.date_depart} onChange={e => setForm(f => ({ ...f, date_depart: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Date retour</label>
-                <input type="date" value={form.date_retour}
-                  onChange={e => setForm(f => ({ ...f, date_retour: e.target.value }))}
-                  className="input-base" />
+                <input type="date" value={form.date_retour} onChange={e => setForm(f => ({ ...f, date_retour: e.target.value }))} className="input-base" />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Commentaires</label>
-                <textarea value={form.commentaires} rows={3}
-                  onChange={e => setForm(f => ({ ...f, commentaires: e.target.value }))}
-                  className="input-base" />
+                <textarea value={form.commentaires} rows={3} onChange={e => setForm(f => ({ ...f, commentaires: e.target.value }))} className="input-base" />
               </div>
-
               <div className="sm:col-span-2 flex gap-2 mt-2">
-                <button type="button" onClick={() => setModal(false)} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
-                  Annuler
-                </button>
-                <button type="submit" className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  {editing ? "Enregistrer" : "Ajouter"}
-                </button>
+                <button type="button" onClick={() => setModal(false)} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">Annuler</button>
+                <button type="submit" className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">{editing ? "Enregistrer" : "Ajouter"}</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ══ Modal Gérer ════════════════════════════════════════════ */}
-      {manageRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setManageRow(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-camublue-900 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><Settings size={18} className="text-white" /></div>
-                <p className="text-white font-bold text-sm">Gérer la mission</p>
-              </div>
-              <button onClick={() => setManageRow(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition"><X size={14} className="text-white" /></button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-sm space-y-1">
-                <p><span className="font-semibold text-gray-700">Plaque :</span> {manageRow.immatriculation}</p>
-                <p><span className="font-semibold text-gray-700">Date :</span> {formatDate(manageRow.date)}</p>
-                <p><span className="font-semibold text-gray-700">Chauffeur :</span> {manageRow.chauffeur || "—"}</p>
-                <p><span className="font-semibold text-gray-700">Destination :</span> {manageRow.destination || "—"}</p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { const m = manageRow; setManageRow(null); openEdit(m); }}
-                  className="flex-1 flex items-center justify-center gap-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Pencil size={14} /> Mise à jour
-                </button>
-                <button
-                  onClick={() => { const m = manageRow; setManageRow(null); handleDelete(m); }}
-                  className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
-                  <Trash2 size={14} /> Supprimer
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

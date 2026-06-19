@@ -161,6 +161,45 @@ export default function SuiviDevisPage() {
     }
   };
 
+  // ── Quick Edit ─────────────────────────────────────────────────────────
+  type QuickEditField = "numero_devis" | "valeur_devis" | "date" | "montant" | "sous_traitant" | "matricule" | "code_snc" | "po_emis";
+  const [quickEdit, setQuickEdit] = useState<{
+    item: SuiviDevis; field: QuickEditField; label: string; type: "text" | "number" | "date";
+  } | null>(null);
+  const [quickValue, setQuickValue] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const openQuickEdit = (
+    e: React.MouseEvent, item: SuiviDevis,
+    field: QuickEditField, label: string, type: "text" | "number" | "date" = "text",
+  ) => {
+    e.stopPropagation();
+    if (isViewer) return;
+    const raw = item[field];
+    const cur = raw != null ? String(raw).slice(0, 10) : "";
+    setQuickEdit({ item, field, label, type });
+    setQuickValue(cur);
+  };
+
+  const handleQuickSave = async () => {
+    if (!quickEdit) return;
+    setQuickSaving(true);
+    const { item, field, type } = quickEdit;
+    const payload: any = {
+      [field]: quickValue === "" ? null : (type === "number" ? Number(quickValue) : quickValue),
+    };
+    try {
+      await suiviDevisService.update(item.id, payload);
+      toast.success("Mis à jour");
+      setQuickEdit(null);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur");
+    } finally {
+      setQuickSaving(false);
+    }
+  };
+
   const [showExport, setShowExport] = useState(false);
   const exportCols: ExportColDef<SuiviDevis>[] = [
     { key: "descriptions",  header: "Descriptions",           value: r => r.descriptions ?? "" },
@@ -260,19 +299,44 @@ export default function SuiviDevisPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredItems.map(d => (
-                  <tr key={d.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(d)}>
-                    <td className="px-4 py-2.5 font-semibold text-gray-700 whitespace-nowrap">{d.descriptions || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.numero_devis || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatMontant(d.valeur_devis)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatDate(d.date)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatMontant(d.montant)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.sous_traitant || "—"}</td>
-                    <td className="px-4 py-2.5 text-camublue-900 font-medium whitespace-nowrap">{d.matricule || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.code_snc || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.po_emis || "—"}</td>
+                {filteredItems.map(d => {
+                  const qTd = "px-4 py-2.5 text-gray-600 whitespace-nowrap";
+                  const qSpan = !isViewer ? "cursor-pointer hover:text-camublue-900 hover:underline transition" : "";
+                  return (
+                  <tr key={d.id} className="hover:bg-gray-50/60">
+                    {/* Descriptions — ouvre modal Gérer */}
+                    <td className="px-4 py-2.5 font-semibold text-gray-700 whitespace-nowrap cursor-pointer"
+                      onClick={() => setManageRow(d)}>
+                      <span className="hover:underline hover:text-camublue-900">{d.descriptions || "—"}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, d, "numero_devis", "N° Devis")}>
+                      <span className={qSpan}>{d.numero_devis || "—"}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, d, "valeur_devis", "Valeur devis (HTVA)", "number")}>
+                      <span className={qSpan}>{formatMontant(d.valeur_devis)}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, d, "date", "Date", "date")}>
+                      <span className={qSpan}>{formatDate(d.date)}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, d, "montant", "Montant", "number")}>
+                      <span className={qSpan}>{formatMontant(d.montant)}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, d, "sous_traitant", "Sous-traitant / Suppliers")}>
+                      <span className={qSpan}>{d.sous_traitant || "—"}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-camublue-900 font-medium whitespace-nowrap"
+                      onClick={e => openQuickEdit(e, d, "matricule", "Matricule")}>
+                      <span className={qSpan}>{d.matricule || "—"}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, d, "code_snc", "Code SNC")}>
+                      <span className={qSpan}>{d.code_snc || "—"}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, d, "po_emis", "PO Emis")}>
+                      <span className={qSpan}>{d.po_emis || "—"}</span>
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -453,6 +517,47 @@ export default function SuiviDevisPage() {
           </div>
         </div>
       )}
+      {/* ══ Modal Quick Edit ══════════════════════════════════════════════ */}
+      {quickEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setQuickEdit(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <p className="text-white font-bold text-sm">{quickEdit.label}</p>
+                <p className="text-white/70 text-xs">{quickEdit.item.descriptions || quickEdit.item.numero_devis || "—"}</p>
+              </div>
+              <button onClick={() => setQuickEdit(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nouvelle valeur</label>
+                <input
+                  autoFocus
+                  type={quickEdit.type}
+                  value={quickValue}
+                  onChange={e => setQuickValue(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleQuickSave(); if (e.key === "Escape") setQuickEdit(null); }}
+                  className="input-base w-full"
+                  placeholder={quickEdit.type === "number" ? "ex: 150000" : ""}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setQuickEdit(null)}
+                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
+                  Annuler
+                </button>
+                <button onClick={handleQuickSave} disabled={quickSaving}
+                  className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-50">
+                  {quickSaving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showExport && (
         <ExportModal
           title="Exporter — Suivi Devis"

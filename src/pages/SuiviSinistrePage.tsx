@@ -189,6 +189,43 @@ export default function SuiviSinistrePage() {
     }
   };
 
+  // ── Quick Edit ──────────────────────────────────────────────────────────
+  type QField = "date_sinistre" | "date_declaration" | "type_location" | "nom_chauffeur" | "snc" | "projet" | "circonstances" | "statut" | "montant_indemnite" | "date_reglement" | "dossier_suivi_par" | "lieu_immobilisation" | "observations";
+  const [quickEdit, setQuickEdit] = useState<{
+    item: SuiviSinistre; field: QField; label: string; type: "text" | "number" | "date" | "textarea";
+  } | null>(null);
+  const [quickValue, setQuickValue] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+
+  const openQuickEdit = (
+    e: React.MouseEvent, item: SuiviSinistre,
+    field: QField, label: string, type: "text" | "number" | "date" | "textarea" = "text",
+  ) => {
+    e.stopPropagation();
+    if (isViewer) return;
+    const raw = item[field];
+    const cur = raw != null ? String(raw).slice(0, 10) : "";
+    setQuickEdit({ item, field, label, type });
+    setQuickValue(cur);
+  };
+
+  const handleQuickSave = async () => {
+    if (!quickEdit) return;
+    setQuickSaving(true);
+    const { item, field, type } = quickEdit;
+    const val = quickValue === "" ? null : (type === "number" ? Number(quickValue) : quickValue);
+    try {
+      await suiSinistreService.update(item.id, { [field]: val } as any);
+      toast.success("Mis à jour");
+      setQuickEdit(null);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur");
+    } finally {
+      setQuickSaving(false);
+    }
+  };
+
   const [showExport, setShowExport] = useState(false);
   const exportCols: ExportColDef<SuiviSinistre>[] = [
     { key: "date_sinistre",       header: "Date sinistre",       value: r => r.date_sinistre?.slice(0, 10) ?? "" },
@@ -302,31 +339,60 @@ export default function SuiviSinistrePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {items.map(s => (
-                  <tr key={s.id} className="hover:bg-gray-50/60 transition cursor-pointer" onClick={() => setManageRow(s)}>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{fmt(s.date_sinistre)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{fmt(s.date_declaration)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
+                {items.map(s => {
+                  const qTd = "px-3 py-2.5 whitespace-nowrap text-gray-600";
+                  const qSpan = !isViewer ? "cursor-pointer hover:text-camublue-900 hover:underline transition" : "";
+                  return (
+                  <tr key={s.id} className="hover:bg-gray-50/60 transition">
+                    <td className={qTd} onClick={e => openQuickEdit(e, s, "date_sinistre", "Date sinistre", "date")}>
+                      <span className={qSpan}>{fmt(s.date_sinistre)}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, s, "date_declaration", "Date déclaration", "date")}>
+                      <span className={qSpan}>{fmt(s.date_declaration)}</span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap" onClick={e => openQuickEdit(e, s, "type_location", "Propriété")}>
                       {s.type_location
-                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-camublue-900/10 text-camublue-900">{s.type_location}</span>
-                        : "—"}
+                        ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-camublue-900/10 text-camublue-900 ${qSpan}`}>{s.type_location}</span>
+                        : <span className={qSpan + " text-gray-400"}>—</span>}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap font-semibold text-gray-800">{s.matricule || "—"}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{s.nom_chauffeur || "—"}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{s.snc || "—"}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
+                    {/* Matricule — ouvre modal Gérer */}
+                    <td className="px-3 py-2.5 whitespace-nowrap font-semibold text-gray-800 cursor-pointer"
+                      onClick={() => setManageRow(s)}>
+                      <span className="hover:underline hover:text-camublue-900">{s.matricule || "—"}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, s, "nom_chauffeur", "Chauffeur")}>
+                      <span className={qSpan}>{s.nom_chauffeur || "—"}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, s, "snc", "SNC")}>
+                      <span className={qSpan}>{s.snc || "—"}</span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap" onClick={e => openQuickEdit(e, s, "projet", "Projet")}>
                       {s.projet
-                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-camublue-900/10 text-camublue-900">{s.projet}</span>
-                        : "—"}
+                        ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-camublue-900/10 text-camublue-900 ${qSpan}`}>{s.projet}</span>
+                        : <span className={qSpan + " text-gray-400"}>—</span>}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap"><CircBadge v={s.circonstances} /></td>
-                    <td className="px-3 py-2.5 whitespace-nowrap"><StatutBadge statut={s.statut} /></td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-right font-semibold text-gray-700">{fmtMoney(s.montant_indemnite)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{fmt(s.date_reglement)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{s.dossier_suivi_par || "—"}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{s.lieu_immobilisation || "—"}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap" onClick={e => openQuickEdit(e, s, "circonstances", "Circonstances")}>
+                      <span className={qSpan}><CircBadge v={s.circonstances} /></span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap" onClick={e => openQuickEdit(e, s, "statut", "Statut")}>
+                      <span className={qSpan}><StatutBadge statut={s.statut} /></span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-right font-semibold text-gray-700"
+                      onClick={e => openQuickEdit(e, s, "montant_indemnite", "Montant indemnité HT (FCFA)", "number")}>
+                      <span className={qSpan}>{fmtMoney(s.montant_indemnite)}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, s, "date_reglement", "Date règlement", "date")}>
+                      <span className={qSpan}>{fmt(s.date_reglement)}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, s, "dossier_suivi_par", "Dossier suivi par")}>
+                      <span className={qSpan}>{s.dossier_suivi_par || "—"}</span>
+                    </td>
+                    <td className={qTd} onClick={e => openQuickEdit(e, s, "lieu_immobilisation", "Lieu d'immobilisation")}>
+                      <span className={qSpan}>{s.lieu_immobilisation || "—"}</span>
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -475,6 +541,56 @@ export default function SuiviSinistrePage() {
                 <button onClick={() => { const r = manageRow; setManageRow(null); handleDelete(r); }}
                   className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-2.5 text-sm font-semibold transition">
                   <Trash2 size={14} /> Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Modal Quick Edit ══════════════════════════════════════════════ */}
+      {quickEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setQuickEdit(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <p className="text-white font-bold text-sm">{quickEdit.label}</p>
+                <p className="text-white/70 text-xs">{quickEdit.item.matricule || "—"}</p>
+              </div>
+              <button onClick={() => setQuickEdit(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nouvelle valeur</label>
+                {quickEdit.type === "textarea" ? (
+                  <textarea
+                    autoFocus rows={3}
+                    value={quickValue}
+                    onChange={e => setQuickValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Escape") setQuickEdit(null); }}
+                    className="input-base w-full"
+                  />
+                ) : (
+                  <input
+                    autoFocus
+                    type={quickEdit.type}
+                    value={quickValue}
+                    onChange={e => setQuickValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") handleQuickSave(); if (e.key === "Escape") setQuickEdit(null); }}
+                    className="input-base w-full"
+                  />
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setQuickEdit(null)}
+                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
+                  Annuler
+                </button>
+                <button onClick={handleQuickSave} disabled={quickSaving}
+                  className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-50">
+                  {quickSaving ? "Enregistrement…" : "Enregistrer"}
                 </button>
               </div>
             </div>
