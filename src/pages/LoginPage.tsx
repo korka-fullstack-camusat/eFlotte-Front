@@ -32,11 +32,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-8 flex flex-col items-center relative">
 
-          <img
-            src="/logo-camusat.png"
-            alt="Camusat"
-            className="h-12 mb-6 object-contain"
-          />
+          <span className="text-3xl font-extrabold text-camublue-900 tracking-tight mb-6">eFlotte</span>
 
           <h1 className="text-xl font-bold text-slate-800 mb-1 text-center">Connexion</h1>
           <p className="text-sm text-slate-400 mb-7 text-center">Accédez à la gestion de la flotte</p>
@@ -95,7 +91,7 @@ export default function LoginPage() {
           </form>
 
           <footer className="mt-8 text-slate-300 text-xs text-center">
-            © {new Date().getFullYear()} Camusat Sénégal — eFlotte
+            © {new Date().getFullYear()} eFlotte — Tous droits réservés
           </footer>
         </div>
       </div>

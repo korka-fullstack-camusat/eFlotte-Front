@@ -176,7 +176,7 @@ export default function EntretiensPage() {
 
   return (
     <AppLayout>
-      <div className="mb-8">
+      <div className="mb-8 sticky top-0 z-20 bg-camugray-100 -mx-4 px-4 md:-mx-8 md:px-8 pt-1 pb-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-camublue-900">Entretiens — Suivi par palier kilométrique</h1>
@@ -235,9 +235,9 @@ export default function EntretiensPage() {
         ) : filtered.length === 0 ? (
           <p className="text-sm text-gray-400 p-6 text-center">Aucun suivi d'entretien trouvé.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[65vh]">
             <table className="w-full text-sm">
-              <thead className="bg-camublue-900 text-white text-xs uppercase">
+              <thead className="bg-camublue-900 text-white text-xs uppercase sticky top-0 z-10">
                 <tr>
                   <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Statut</th>
                   <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Fournisseur</th>

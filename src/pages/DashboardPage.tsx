@@ -231,7 +231,7 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
-      <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
+      <div className="mb-6 flex items-start justify-between flex-wrap gap-3 sticky top-0 z-20 bg-camugray-100 -mx-4 px-4 md:-mx-8 md:px-8 pt-1 pb-3">
         <div>
           <h1 className="text-2xl font-bold text-camublue-900 mb-1">Tableau de bord</h1>
           <p className="text-gray-500 text-sm">

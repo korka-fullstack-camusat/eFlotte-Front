@@ -192,9 +192,9 @@ export default function Sidebar() {
       />
 
       {/* Sidebar Desktop */}
-      <aside className="bg-white shadow-md w-72 min-h-screen hidden md:flex md:flex-col border-r">
-        <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-center">
-          <img src="/logo-camusat.png" alt="Camusat" className="w-full max-w-[180px] object-contain" />
+      <aside className="bg-white shadow-md w-72 h-screen sticky top-0 hidden md:flex md:flex-col border-r overflow-y-auto">
+        <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-center shrink-0">
+          <span className="text-2xl font-extrabold text-camublue-900 tracking-tight">eFlotte</span>
         </div>
         <SidebarContent />
       </aside>
@@ -206,7 +206,7 @@ export default function Sidebar() {
         } md:hidden`}
       >
         <div className="flex items-center justify-between px-5 py-5 border-b border-gray-100">
-          <img src="/logo-camusat.png" alt="Camusat" className="h-9 object-contain" />
+          <span className="text-xl font-extrabold text-camublue-900 tracking-tight">eFlotte</span>
           <button onClick={() => setMobileOpen(false)}>
             <X size={24} className="text-camublue-900" />
           </button>

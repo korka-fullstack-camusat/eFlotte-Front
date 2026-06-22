@@ -6,7 +6,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
       {/* Logo */}
-      <img src="/logo-camusat.png" alt="Camusat" className="w-52 mb-8" />
+      <span className="text-5xl font-extrabold text-camublue-900 tracking-tight mb-8">eFlotte</span>
 
       {/* Titre */}
       <h1 className="text-4xl font-extrabold text-camublue-900 text-center">
@@ -26,7 +26,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <p className="absolute bottom-6 text-xs text-gray-300">
-        © 2026 Camusat — Usage interne uniquement
+        © 2026 eFlotte — Usage interne uniquement
       </p>
     </div>
   );

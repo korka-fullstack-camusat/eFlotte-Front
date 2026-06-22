@@ -398,7 +398,7 @@ export default function ExportPage() {
   return (
     <AppLayout>
       {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 sticky top-0 z-20 bg-camugray-100 -mx-4 px-4 md:-mx-8 md:px-8 pt-1 pb-3">
         <div>
           <h1 className="text-2xl font-bold text-camublue-900">Export en masse</h1>
           <p className="text-gray-400 text-sm mt-0.5">Historique des fichiers générés</p>
@@ -441,8 +441,9 @@ export default function ExportPage() {
             <p className="text-xs text-gray-300 mt-1">Cliquez sur « Exporter » pour générer votre premier fichier</p>
           </div>
         ) : (
+          <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
           <table className="w-full text-sm">
-            <thead className="bg-camublue-900 text-white text-xs uppercase">
+            <thead className="bg-camublue-900 text-white text-xs uppercase sticky top-0 z-10">
               <tr>
                 <th className="text-left px-5 py-3 font-semibold">Date</th>
                 <th className="text-left px-5 py-3 font-semibold">Fichier</th>
@@ -494,6 +495,7 @@ export default function ExportPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

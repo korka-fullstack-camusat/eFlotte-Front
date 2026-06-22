@@ -115,7 +115,7 @@ export default function ImportPage() {
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-8 sticky top-0 z-20 bg-camugray-100 pt-1 pb-3">
           <h1 className="text-2xl font-bold text-camublue-900">Import en masse</h1>
           <p className="text-gray-500 text-sm mt-0.5">
             Uploadez le fichier Excel du tableau de bord pour alimenter automatiquement toutes les rubriques
@@ -236,8 +236,9 @@ export default function ImportPage() {
             </div>
 
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden mb-6">
+              <div className="overflow-x-auto overflow-y-auto max-h-[50vh]">
               <table className="w-full text-sm">
-                <thead className="bg-camublue-900 text-white text-xs uppercase">
+                <thead className="bg-camublue-900 text-white text-xs uppercase sticky top-0 z-10">
                   <tr>
                     <th className="text-left px-4 py-2.5 font-semibold">Section</th>
                     <th className="text-left px-4 py-2.5 font-semibold">Feuille Excel</th>
@@ -283,6 +284,7 @@ export default function ImportPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {totalErrors > 0 && (
@@ -348,8 +350,9 @@ export default function ImportPage() {
             <div className="text-center py-10 text-sm text-gray-400">Aucun import enregistré</div>
           ) : (
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto overflow-y-auto max-h-[50vh]">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase">
+                <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase sticky top-0 z-10">
                   <tr>
                     <th className="text-left px-4 py-2.5 font-semibold">Date</th>
                     <th className="text-left px-4 py-2.5 font-semibold">Fichier</th>
@@ -403,6 +406,7 @@ export default function ImportPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
