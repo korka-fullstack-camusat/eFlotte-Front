@@ -73,7 +73,11 @@ const EXPORT_MODULES: {
 }[] = [
   {
     key: "data_flottes", label: "Données flottes", icon: <DollarSign size={16} />, color: "text-emerald-700 bg-emerald-100",
-    fetchAll: async (p) => (await coutService.getAll({ annee: p.annee, mois: p.mois, page_size: 9999 })).items,
+    fetchAll: async (p) => (await coutService.getAll({
+      annee: p.annee,
+      mois: p.annee && p.mois ? `${p.annee}-${String(p.mois).padStart(2, "0")}` : undefined,
+      page_size: 9999,
+    })).items,
     cols: [
       { header: "Immatriculation",   value: r => r.immatriculation ?? "" },
       { header: "Type",              value: r => r.type_vehicule ?? "" },
@@ -91,7 +95,7 @@ const EXPORT_MODULES: {
   },
   {
     key: "missions", label: "Chauffeurs Pôles", icon: <Navigation size={16} />, color: "text-sky-700 bg-sky-100",
-    fetchAll: async (p) => (await missionChauffeurService.getAll({ annee: p.annee as any, mois: p.mois as any, page_size: 9999 })).items,
+    fetchAll: async (_p) => (await missionChauffeurService.getAll({ page_size: 9999 })).items,
     cols: [
       { header: "Immatriculation", value: r => r.immatriculation ?? "" },
       { header: "Chauffeur",       value: r => r.chauffeur ?? "" },
@@ -106,7 +110,7 @@ const EXPORT_MODULES: {
   },
   {
     key: "devis", label: "Suivi des devis", icon: <FileText size={16} />, color: "text-violet-700 bg-violet-100",
-    fetchAll: async (p) => (await suiviDevisService.getAll({ annee: p.annee as any, mois: p.mois as any, page_size: 9999 })).items,
+    fetchAll: async (_p) => (await suiviDevisService.getAll({ page_size: 9999 })).items,
     cols: [
       { header: "Immatriculation", value: r => r.immatriculation ?? "" },
       { header: "N° Devis",        value: r => r.numero_devis ?? "" },
@@ -123,7 +127,7 @@ const EXPORT_MODULES: {
   {
     key: "checklists", label: "Check-lists VL", icon: <ClipboardCheck size={16} />, color: "text-amber-700 bg-amber-100",
     fetchAll: async (p) => {
-      const res = await checklistVLService.getAll({ annee: p.annee as any, page_size: 9999 });
+      const res = await checklistVLService.getAll({ page_size: 9999 });
       return res.items;
     },
     cols: [
@@ -169,7 +173,7 @@ const EXPORT_MODULES: {
   },
   {
     key: "pannes", label: "Suivi des pannes", icon: <AlertOctagon size={16} />, color: "text-red-700 bg-red-100",
-    fetchAll: async (p) => (await suiviPanneService.getAll({ annee: p.annee as any, mois: p.mois as any, page_size: 9999 })).items,
+    fetchAll: async (_p) => (await suiviPanneService.getAll({ page_size: 9999 })).items,
     cols: [
       { header: "Immatriculation", value: r => r.immatriculation ?? "" },
       { header: "Nature panne",    value: r => r.nature_panne ?? "" },
@@ -202,7 +206,7 @@ const EXPORT_MODULES: {
   },
   {
     key: "sinistres", label: "Suivi sinistres", icon: <ShieldAlert size={16} />, color: "text-pink-700 bg-pink-100",
-    fetchAll: async (p) => (await suiSinistreService.getAll({ annee: p.annee as any, mois: p.mois as any, page_size: 9999 })).items,
+    fetchAll: async (_p) => (await suiSinistreService.getAll({ page_size: 9999 })).items,
     cols: [
       { header: "Immatriculation", value: r => r.immatriculation ?? "" },
       { header: "Nature sinistre", value: r => r.nature_sinistre ?? "" },
