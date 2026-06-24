@@ -19,9 +19,11 @@ import {
   ShieldAlert,
   ChevronRight,
   Car,
+  Palette,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type NavItem = {
   label: string;
@@ -133,6 +135,61 @@ function NavGroupComp({ group, onClose }: { group: NavGroup; onClose?: () => voi
   );
 }
 
+const PRESET_COLORS = ["#003c71", "#0f766e", "#7c2d12", "#4c1d95", "#831843", "#14532d", "#1e293b"];
+
+function ThemePicker() {
+  const { color, setColor } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(color);
+
+  useEffect(() => { if (open) setDraft(color); }, [open, color]);
+
+  return (
+    <div className="px-4 py-3 border-t border-gray-100">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium text-gray-700 hover:bg-camublue-900/10 hover:text-camublue-900 transition-all text-sm"
+      >
+        <Palette size={18} className="shrink-0" />
+        <span className="flex-1 truncate text-left">Couleur de l'interface</span>
+        <span
+          className="w-4 h-4 rounded-full border border-gray-200 shrink-0"
+          style={{ backgroundColor: color }}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-2 px-2 py-3 bg-camugray-100 rounded-lg space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {PRESET_COLORS.map(c => (
+              <button
+                key={c}
+                onClick={() => setDraft(c)}
+                className={`w-7 h-7 rounded-full border-2 transition ${draft === c ? "border-camublue-900 scale-110" : "border-white"}`}
+                style={{ backgroundColor: c }}
+                aria-label={c}
+              />
+            ))}
+            <input
+              type="color"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              className="w-7 h-7 rounded-full border-2 border-white cursor-pointer p-0 overflow-hidden"
+              title="Couleur personnalisée"
+            />
+          </div>
+          <button
+            onClick={() => { setColor(draft); setOpen(false); }}
+            className="w-full bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-lg py-2 text-xs font-semibold transition"
+          >
+            Valider
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const { user, logout } = useAuth();
 
@@ -171,6 +228,7 @@ export default function Sidebar() {
             : <NavLink key={entry.path} item={entry} onClose={onClose} />
         )}
       </nav>
+      <ThemePicker />
       <SidebarFooter />
     </>
   );
@@ -194,7 +252,7 @@ export default function Sidebar() {
       {/* Sidebar Desktop */}
       <aside className="bg-white shadow-md w-72 h-screen sticky top-0 hidden md:flex md:flex-col border-r overflow-y-auto">
         <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-center shrink-0">
-          <span className="text-2xl font-extrabold text-camublue-900 tracking-tight">eFlotte</span>
+          <span className="text-2xl font-extrabold text-camublue-900 tracking-tight">P.A.R.C-CAM</span>
         </div>
         <SidebarContent />
       </aside>
@@ -206,7 +264,7 @@ export default function Sidebar() {
         } md:hidden`}
       >
         <div className="flex items-center justify-between px-5 py-5 border-b border-gray-100">
-          <span className="text-xl font-extrabold text-camublue-900 tracking-tight">eFlotte</span>
+          <span className="text-xl font-extrabold text-camublue-900 tracking-tight">P.A.R.C-CAM</span>
           <button onClick={() => setMobileOpen(false)}>
             <X size={24} className="text-camublue-900" />
           </button>

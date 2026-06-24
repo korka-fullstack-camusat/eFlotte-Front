@@ -15,7 +15,7 @@ export default {
       },
       colors: {
         camublue: {
-          900: "#003c71",
+          900: "hsl(var(--camublue-900) / <alpha-value>)",
         },
         camugray: {
           100: "#f6f8fa",

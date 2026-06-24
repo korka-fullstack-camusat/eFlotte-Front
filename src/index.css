@@ -12,6 +12,7 @@
 
 @layer base {
   :root {
+    --camublue-900: 210 100% 22%;
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;

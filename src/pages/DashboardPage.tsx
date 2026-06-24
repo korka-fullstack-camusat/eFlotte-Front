@@ -140,7 +140,7 @@ export default function DashboardPage() {
             <h2 className="text-lg sm:text-xl font-extrabold tracking-tight uppercase">
               Gestion de parc automobile — {vehicules.length} véhicule{vehicules.length > 1 ? "s" : ""}
             </h2>
-            <p className="text-white/70 text-xs sm:text-sm mt-0.5">eFlotte — Logistique &amp; flotte</p>
+            <p className="text-white/70 text-xs sm:text-sm mt-0.5">P.A.R.C-CAM — Logistique &amp; flotte</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

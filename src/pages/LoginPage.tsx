@@ -20,7 +20,17 @@ export default function LoginPage() {
       await login(username, password);
       navigate("/dashboard");
     } catch (err: any) {
-      const msg = err?.response?.data?.detail ?? "Identifiants incorrects ou erreur réseau.";
+      console.error("Erreur de connexion :", err);
+      let msg: string;
+      if (err?.response?.data?.detail) {
+        msg = err.response.data.detail;
+      } else if (err?.response) {
+        msg = `Erreur serveur (${err.response.status}). Réessayez dans quelques instants.`;
+      } else if (err?.code === "ERR_NETWORK" || err?.message === "Network Error") {
+        msg = "Impossible de contacter le serveur. Le service est peut-être en veille (réessayez dans 30 à 60 secondes) ou vérifiez votre connexion.";
+      } else {
+        msg = `Erreur inattendue : ${err?.message ?? "inconnue"}`;
+      }
       setError(msg);
     }
   };
@@ -32,7 +42,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-8 flex flex-col items-center relative">
 
-          <span className="text-3xl font-extrabold text-camublue-900 tracking-tight mb-6">eFlotte</span>
+          <span className="text-3xl font-extrabold text-camublue-900 tracking-tight mb-6">P.A.R.C-CAM</span>
 
           <h1 className="text-xl font-bold text-slate-800 mb-1 text-center">Connexion</h1>
           <p className="text-sm text-slate-400 mb-7 text-center">Accédez à la gestion de la flotte</p>

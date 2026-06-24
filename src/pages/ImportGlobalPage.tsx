@@ -365,7 +365,7 @@ export default function ImportGlobalPage() {
       const periodLabel = period.annee
         ? `_${period.annee}${period.mois ? "_M" + String(period.mois).padStart(2, "0") : ""}`
         : "";
-      const filename = `Export_eFlotte${periodLabel}_${new Date().toISOString().slice(0,10)}`;
+      const filename = `Export_PARC-CAM${periodLabel}_${new Date().toISOString().slice(0,10)}`;
 
       const result = await (writeXlsxFile as any)(sheets, { sheets: sheetNames, columns: sheetCols });
       await result.toFile(`${filename}.xlsx`);
