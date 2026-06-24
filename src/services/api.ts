@@ -70,6 +70,10 @@ export const coutService = {
     const { data } = await axios.get("/api/couts/par-vehicule", { params });
     return data;
   },
+  topCarburant: async (params: { type_carburant: "ESSENCE" | "GASOIL"; annee?: number; mois?: string; limit?: number }): Promise<VehiculeCoutPoint[]> => {
+    const { data } = await axios.get("/api/couts/top-carburant", { params });
+    return data;
+  },
   filtres: async (): Promise<FiltresCouts> => {
     const { data } = await axios.get("/api/couts/filtres");
     return data;

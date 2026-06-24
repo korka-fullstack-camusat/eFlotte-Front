@@ -16,13 +16,13 @@ export function KpiCard({ label, value, icon, bg, text, suffix, valueColor }: {
   );
 }
 
-export function BarRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+export function BarRow({ label, value, max, color, unit }: { label: string; value: number; max: number; color: string; unit?: string }) {
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
   return (
     <div>
       <div className="flex items-center justify-between text-xs mb-1">
         <span className="font-semibold text-gray-700">{label}</span>
-        <span className="text-gray-500">{value.toLocaleString("fr-FR")}</span>
+        <span className="text-gray-500">{value.toLocaleString("fr-FR")}{unit ? ` ${unit}` : ""}</span>
       </div>
       <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />

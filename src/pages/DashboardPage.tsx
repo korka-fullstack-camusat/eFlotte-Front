@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { CheckCircle, Wallet, Fuel, BarChart2, Ban, Filter, X, Car, Wrench } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { vehiculeService, coutService } from "@/services/api";
-import type { Vehicule, KpiCouts, EvolutionPoint, FiltresCouts, CoutsFilters } from "@/types";
-import { KpiCard, MiniLineChart, MiniBarChart, DonutChart } from "@/components/charts";
+import type { Vehicule, KpiCouts, EvolutionPoint, VehiculeCoutPoint, FiltresCouts, CoutsFilters } from "@/types";
+import { KpiCard, MiniLineChart, MiniBarChart, DonutChart, BarRow } from "@/components/charts";
 
 function normStatut(s: string | null | undefined): string {
   return (s || "")
@@ -46,6 +46,29 @@ function aggregateCount<T>(items: T[], getKey: (item: T) => string | null | unde
     .map(([label, value]) => ({ label, value }));
 }
 
+const RANK_COLORS = ["bg-camublue-900", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-violet-500", "bg-cyan-500", "bg-lime-500", "bg-pink-500", "bg-indigo-500", "bg-orange-500"];
+
+function TopList({ items, unit }: { items: VehiculeCoutPoint[]; unit?: string }) {
+  if (items.length === 0) {
+    return <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>;
+  }
+  const max = Math.max(1, ...items.map(i => i.total));
+  return (
+    <div className="space-y-3">
+      {items.map((it, i) => (
+        <BarRow
+          key={it.plaque_immatriculation}
+          label={`${i + 1}. ${it.plaque_immatriculation}`}
+          value={it.total}
+          max={max}
+          unit={unit}
+          color={RANK_COLORS[i % RANK_COLORS.length]}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
   const [kpi, setKpi] = useState<KpiCouts | null>(null);
@@ -55,6 +78,10 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState<CoutsFilters>({});
   const [filterModal, setFilterModal] = useState(false);
   const [draft, setDraft] = useState<CoutsFilters>({});
+  const [topEssence, setTopEssence] = useState<VehiculeCoutPoint[]>([]);
+  const [topGasoil, setTopGasoil] = useState<VehiculeCoutPoint[]>([]);
+  const [topKm, setTopKm] = useState<VehiculeCoutPoint[]>([]);
+  const [topReparation, setTopReparation] = useState<VehiculeCoutPoint[]>([]);
 
   useEffect(() => {
     vehiculeService.getAll().then(setVehicules).catch(() => {});
@@ -67,6 +94,10 @@ export default function DashboardPage() {
     coutService.kpi(params).then(setKpi).catch(() => {});
     coutService.evolution({ ...params, type_cout: "CARBURANT" }).then(setEvolutionCarburant).catch(() => {});
     coutService.evolution({ ...params, type_cout: "ENT" }).then(setEvolutionMaintenance).catch(() => {});
+    coutService.topCarburant({ type_carburant: "ESSENCE", annee: params.annee, mois: params.mois, limit: 10 }).then(setTopEssence).catch(() => {});
+    coutService.topCarburant({ type_carburant: "GASOIL", annee: params.annee, mois: params.mois, limit: 10 }).then(setTopGasoil).catch(() => {});
+    coutService.parVehicule({ ...params, type_cout: "DISTANCE", limit: 10 }).then(setTopKm).catch(() => {});
+    coutService.parVehicule({ ...params, type_cout: "REP", limit: 10 }).then(setTopReparation).catch(() => {});
   }, [filters]);
 
   const enServiceCount = vehicules.filter(v => normStatut(v.statut) === "EN_SERVICE").length;
@@ -226,6 +257,29 @@ export default function DashboardPage() {
           ) : (
             <MiniLineChart points={evolutionMaintenance} />
           )}
+        </div>
+      </div>
+
+      {/* Top 10 classements */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-camublue-900 mb-4">Top 10 — Consommation Essence (FCFA)</h2>
+          <TopList items={topEssence} />
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-camublue-900 mb-4">Top 10 — Consommation Gasoil (FCFA)</h2>
+          <TopList items={topGasoil} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-camublue-900 mb-4">Top 10 — Véhicules les plus kilométrés</h2>
+          <TopList items={topKm} unit="km" />
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-camublue-900 mb-4">Top 10 — Coûts de réparation (FCFA)</h2>
+          <TopList items={topReparation} />
         </div>
       </div>
 

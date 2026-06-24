@@ -17,6 +17,7 @@ export interface Vehicule {
   marque: string | null;
   annee: number | null;
   statut: string | null;
+  type_carburant: string | null;
   chauffeur: string | null;
   kilometrage: number | null;
   dernier_service: string | null;
