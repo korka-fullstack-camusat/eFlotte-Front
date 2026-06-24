@@ -14,6 +14,14 @@ export interface Vehicule {
   trousse_secours: string | null;
   peage: string | null;
   carte_carburant: string | null;
+  marque: string | null;
+  annee: number | null;
+  statut: string | null;
+  chauffeur: string | null;
+  kilometrage: number | null;
+  dernier_service: string | null;
+  prochaine_vidange: string | null;
+  localisation: string | null;
   created_at: string | null;
 }
 

@@ -1,5 +1,5 @@
-export function KpiCard({ label, value, icon, bg, text, suffix }: {
-  label: string; value: number; icon: React.ReactNode; bg: string; text: string; suffix?: string;
+export function KpiCard({ label, value, icon, bg, text, suffix, valueColor }: {
+  label: string; value: number; icon: React.ReactNode; bg: string; text: string; suffix?: string; valueColor?: string;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-5 flex flex-col items-center text-center gap-2">
@@ -7,7 +7,7 @@ export function KpiCard({ label, value, icon, bg, text, suffix }: {
         <span className={text}>{icon}</span>
       </div>
       <div>
-        <p className="text-2xl font-black text-gray-800">
+        <p className={`text-2xl font-black ${valueColor ?? "text-gray-800"}`}>
           {value.toLocaleString("fr-FR")}{suffix ? <span className="text-sm font-semibold text-gray-400 ml-1">{suffix}</span> : null}
         </p>
         <p className="text-xs text-gray-500 mt-0.5">{label}</p>
@@ -85,6 +85,45 @@ export function DonutChart({ data, colors = DONUT_COLORS }: { data: { label: str
 }
 
 const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+
+export function MiniBarChart({ points, color = "#1e3a5f" }: { points: { mois: number; total: number }[]; color?: string }) {
+  const width = 600;
+  const height = 180;
+  const padding = 30;
+  const max = Math.max(1, ...points.map(p => p.total));
+  const data = Array.from({ length: 12 }, (_, i) => {
+    const found = points.find(p => p.mois === i + 1);
+    return found ? found.total : 0;
+  });
+  const stepX = (width - padding * 2) / 12;
+  const barWidth = stepX * 0.55;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-44">
+      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e5e7eb" />
+      {data.map((v, i) => {
+        const x = padding + i * stepX + (stepX - barWidth) / 2;
+        const barHeight = (v / max) * (height - padding * 2);
+        const y = height - padding - barHeight;
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barWidth} height={Math.max(barHeight, 1)} rx={3} fill={color} />
+            {v > 0 && (
+              <text x={x + barWidth / 2} y={y - 6} fontSize={9.5} textAnchor="middle" fill="#6b7280">
+                {v.toLocaleString("fr-FR")}
+              </text>
+            )}
+          </g>
+        );
+      })}
+      {data.map((_, i) => (
+        <text key={i} x={padding + i * stepX + stepX / 2} y={height - padding + 16} fontSize={10} textAnchor="middle" fill="#9ca3af">
+          {MOIS_LABELS[i]}
+        </text>
+      ))}
+    </svg>
+  );
+}
 
 export function MiniLineChart({ points }: { points: { mois: number; total: number }[] }) {
   const width = 600;
