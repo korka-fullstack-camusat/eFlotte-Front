@@ -5,7 +5,7 @@ import {
   Car, DollarSign, Navigation, FileText, ClipboardCheck, Wrench,
   AlertOctagon, CircleDot, X, History, ChevronDown, ChevronUp,
   ShieldAlert, LayoutGrid, ChevronRight as ChevronRightIcon,
-  Download, Search, Package, Calendar, Trash2,
+  Download, Search, Package, Calendar, Trash2, Fuel,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -30,6 +30,7 @@ interface ImportResult {
   vehicules: SectionResult; couts: SectionResult; missions: SectionResult;
   devis: SectionResult; checklists: SectionResult; entretiens: SectionResult;
   entretiens_bis: SectionResult; pannes: SectionResult; pneumatiques: SectionResult;
+  carburant: SectionResult;
 }
 interface HistoryEntry {
   id: number; created_at: string; username: string | null; filename: string | null;
@@ -61,6 +62,7 @@ const SECTIONS: { key: keyof ImportResult; label: string; sheet: string; icon: R
   { key: "entretiens_bis", label: "Entretien BIS",      sheet: "ENTRETIEN BIS",            icon: <Wrench size={18} />,        color: "text-rose-700 bg-rose-100" },
   { key: "pannes",         label: "Suivi des pannes",   sheet: "SUIVI DES PANNE",          icon: <AlertOctagon size={18} />,  color: "text-red-700 bg-red-100" },
   { key: "pneumatiques",   label: "Pneumatiques",       sheet: "PNEUMATIQUE",              icon: <CircleDot size={18} />,     color: "text-teal-700 bg-teal-100" },
+  { key: "carburant",      label: "Carburant",          sheet: "CARBURANT",                icon: <Fuel size={18} />,          color: "text-blue-700 bg-blue-100" },
 ];
 
 /* ── Modules exportables avec leurs colonnes ── */

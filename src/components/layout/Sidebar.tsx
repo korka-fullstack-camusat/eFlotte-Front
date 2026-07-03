@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Car,
   Palette,
+  Fuel,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,6 +57,7 @@ const navEntries: NavEntry[] = [
     icon: <Car size={20} />,
     children: [
       { label: "Données flottes",  path: "/data-flottes",    icon: <Database size={16} /> },
+      { label: "Carburant",        path: "/carburant",        icon: <Fuel size={16} /> },
       { label: "Chauffeurs Pôles", path: "/chauffeurs-poles", icon: <Navigation size={16} /> },
       { label: "Check-lists VL",   path: "/checklists-vl",   icon: <ClipboardCheck size={16} /> },
       { label: "Pneumatiques",     path: "/pneumatiques",    icon: <CircleDot size={16} /> },
