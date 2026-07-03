@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import AppLayout from "@/components/layout/AppLayout";
+import axios from "axios";
 import {
   coutService, missionChauffeurService, suiviDevisService,
   checklistVLService, suiviPanneService, pneumatiqueService, suiSinistreService,
@@ -191,6 +192,25 @@ function buildPneumatiques(rows: any[]) {
   return { data: allRows, columns: COLS.map((h, i) => ({ width: autoWidth(allRows, i, h) })), sheet: "PNEUMATIQUE" };
 }
 
+function buildCarburant(rows: any[]) {
+  const COLS = [
+    "Matricule","Type Carburant","Quantité totale (L)","Montant total (FCFA)",
+    "Mt HT","Prix unitaire","Distance totale (km)","Distance GPS",
+    "CarGroup / Pôle","Dernier plein","Driver name","Nom chauffeur",
+    "Code projet","N° carte",
+  ];
+  const header = COLS.map(H);
+  const data = rows.map(r => [
+    D(r.matricule), D(r.type_carburant),
+    D(r.quantite_totale), D(r.montant_total), D(r.mt_ht), D(r.prix_unitaire),
+    D(r.distance_totale), D(r.distance_gps), D(r.car_group),
+    D(r.dernier_plein?.slice(0, 10)), D(r.driver_name), D(r.nom_chauffeur),
+    D(r.code_projet), D(r.num_carte),
+  ]);
+  const allRows = [header, ...data];
+  return { data: allRows, columns: COLS.map((h, i) => ({ width: autoWidth(allRows, i, h) })), sheet: "CARBURANT" };
+}
+
 function buildSinistres(rows: any[]) {
   const COLS = [
     "N°","DATE DE DECLARATION","CATEGORIE","BRANCHE","MATRICULE","PROPRIETE",
@@ -242,7 +262,7 @@ export default function ExportPage() {
    * On NE passe PAS mois (backend attend date, pas entier) → 422 sinon.
    * ────────────────────────────────────────────────────────────────────── */
   async function loadFlotteData(p: PeriodFilter) {
-    const [couts, missions, devis, checklists, entretiens, entretiensBis, pannes, pneumatiques] =
+    const [couts, missions, devis, checklists, entretiens, entretiensBis, pannes, pneumatiques, carburantRes] =
       await Promise.all([
         coutService.getAll({ annee: p.annee, page_size: 9999 } as any).then(r => r.items),
         missionChauffeurService.getAll({ page_size: 9999 }).then(r => r.items),
@@ -252,10 +272,12 @@ export default function ExportPage() {
         entretienBisService.getAll(),
         suiviPanneService.getAll({ page_size: 9999 }).then(r => r.items),
         pneumatiqueService.getAll({ page_size: 9999 }).then(r => r.items),
+        axios.get("/api/carburant", { params: { page: 1, page_size: 9999 } }).then(r => r.data.items as any[]),
       ]);
-    return { couts, missions, devis, checklists, entretiens, entretiensBis, pannes, pneumatiques,
+    const carburant = carburantRes;
+    return { couts, missions, devis, checklists, entretiens, entretiensBis, pannes, pneumatiques, carburant,
       total: couts.length + missions.length + devis.length + checklists.length +
-             entretiens.length + entretiensBis.length + pannes.length + pneumatiques.length };
+             entretiens.length + entretiensBis.length + pannes.length + pneumatiques.length + carburant.length };
   }
 
   async function loadSinistresData(_p: PeriodFilter) {
@@ -287,6 +309,7 @@ export default function ExportPage() {
           buildEntretienBis(d.entretiensBis),
           buildSuiviPannes(d.pannes),
           buildPneumatiques(d.pneumatiques),
+          buildCarburant(d.carburant),
         ]);
 
         if (target === "flotte") {
@@ -358,6 +381,7 @@ export default function ExportPage() {
           buildSuiviDevis(d.devis), buildCheckListsVL(d.checklists),
           buildEntretiens(d.entretiens), buildEntretienBis(d.entretiensBis),
           buildSuiviPannes(d.pannes), buildPneumatiques(d.pneumatiques),
+          buildCarburant(d.carburant),
         ]);
         if (tgt === "flotte") { downloadBlob(blob, `TABLEAU DE BORD FLOTTE ANNEE ${y}.xlsx`); return; }
 
@@ -389,9 +413,9 @@ export default function ExportPage() {
     : "Toutes périodes";
 
   const TARGET_META: Record<ExportTarget, { label: string; icon: React.ReactNode; desc: string; ext: string }> = {
-    flotte:    { label: "TABLEAU DE BORD FLOTTE",     icon: <FileSpreadsheet size={20} className="text-emerald-600" />, desc: "8 feuilles : DATA, CHAUFFEURS, DEVIS, CHECK LISTS, ENTRETIENS, PANNES, PNEUMATIQUES…", ext: ".xlsx" },
-    sinistres: { label: "ETAT SUIVI DES SINISTRES",   icon: <ShieldAlert size={20} className="text-rose-500" />,        desc: "1 feuille : DONNEES",                                                                    ext: ".xlsx" },
-    both:      { label: "Les 2 fichiers (dossier ZIP)", icon: <FolderArchive size={20} className="text-amber-500" />,   desc: "Télécharge un dossier .zip contenant les 2 fichiers Excel",                               ext: ".zip"  },
+    flotte:    { label: "TABLEAU DE BORD FLOTTE",       icon: <FileSpreadsheet size={20} className="text-emerald-600" />, desc: "9 feuilles : DATA, CHAUFFEURS, DEVIS, CHECK LISTS, ENTRETIENS×2, PANNES, PNEUMATIQUES, CARBURANT", ext: ".xlsx" },
+    sinistres: { label: "ETAT SUIVI DES SINISTRES",     icon: <ShieldAlert size={20} className="text-rose-500" />,        desc: "1 feuille : DONNEES",                                                                         ext: ".xlsx" },
+    both:      { label: "Les 2 fichiers (dossier ZIP)", icon: <FolderArchive size={20} className="text-amber-500" />,     desc: "Télécharge un dossier .zip contenant les 2 fichiers Excel",                                    ext: ".zip"  },
   };
 
   /* ─────────────────────── RENDER ───────────────────────── */
@@ -670,10 +694,10 @@ export default function ExportPage() {
                   { label: "Lignes exportées", value: e.totalRows.toLocaleString("fr-FR") },
                   { label: "Contenu",          value:
                       e.type === "zip"
-                        ? "TABLEAU DE BORD FLOTTE (8 feuilles) + ETAT SUIVI DES SINISTRES"
+                        ? "TABLEAU DE BORD FLOTTE (9 feuilles) + ETAT SUIVI DES SINISTRES"
                         : e.type === "sinistres"
                         ? "ETAT SUIVI DES SINISTRES — feuille DONNEES"
-                        : "TABLEAU DE BORD FLOTTE — 8 feuilles (DATA, CHAUFFEURS, DEVIS, CHECK LISTS, ENTRETIENS×2, PANNES, PNEUMATIQUES)"
+                        : "TABLEAU DE BORD FLOTTE — 9 feuilles (DATA, CHAUFFEURS, DEVIS, CHECK LISTS, ENTRETIENS×2, PANNES, PNEUMATIQUES, CARBURANT)"
                   },
                 ].map(row => (
                   <div key={row.label} className="flex gap-4">
