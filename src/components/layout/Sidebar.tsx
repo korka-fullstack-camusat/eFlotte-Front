@@ -77,6 +77,7 @@ const navEntries: NavEntry[] = [
     children: [
       { label: "Suivi des devis",  path: "/suivi-devis",     icon: <FileText size={16} /> },
       { label: "Suivi des Pannes", path: "/suivi-pannes",    icon: <AlertTriangle size={16} /> },
+      { label: "Récap des Pannes", path: "/recap-pannes",   icon: <AlertTriangle size={16} /> },
       { label: "Suivi sinistres",  path: "/suivi-sinistres", icon: <ShieldAlert size={16} /> },
     ],
   },

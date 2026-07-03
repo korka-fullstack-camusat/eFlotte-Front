@@ -18,6 +18,7 @@ const ImportPage         = lazy(() => import("@/pages/ImportPage"));
 const ExportPage         = lazy(() => import("@/pages/ExportPage"));
 const UsersPage          = lazy(() => import("@/pages/UsersPage"));
 const CarburantPage      = lazy(() => import("@/pages/CarburantPage"));
+const RecapPannePage     = lazy(() => import("@/pages/RecapPannePage"));
 
 function PageLoader() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/export-global" element={<ProtectedRoute><ExportPage /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
         <Route path="/carburant" element={<ProtectedRoute><CarburantPage /></ProtectedRoute>} />
+        <Route path="/recap-pannes" element={<ProtectedRoute><RecapPannePage /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

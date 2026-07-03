@@ -104,6 +104,7 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState<CoutsFilters>({});
   const [filterModal, setFilterModal] = useState(false);
   const [draft, setDraft] = useState<CoutsFilters>({});
+  const [evolutionReparation, setEvolutionReparation] = useState<EvolutionPoint[]>([]);
   const [topEssence, setTopEssence] = useState<VehiculeCoutPoint[]>([]);
   const [topGasoil, setTopGasoil] = useState<VehiculeCoutPoint[]>([]);
   const [topKm, setTopKm] = useState<VehiculeCoutPoint[]>([]);
@@ -122,6 +123,7 @@ export default function DashboardPage() {
     coutService.kpi(params).then(setKpi).catch(() => {});
     coutService.evolution({ ...params, type_cout: "CARBURANT" }).then(setEvolutionCarburant).catch(() => {});
     coutService.evolution({ ...params, type_cout: "ENT" }).then(setEvolutionMaintenance).catch(() => {});
+    coutService.evolution({ ...params, type_cout: "REP" }).then(setEvolutionReparation).catch(() => {});
     coutService.topCarburant({ type_carburant: "ESSENCE", annee: params.annee, mois: params.mois, limit: 10 }).then(setTopEssence).catch(() => {});
     coutService.topCarburant({ type_carburant: "GASOIL", annee: params.annee, mois: params.mois, limit: 10 }).then(setTopGasoil).catch(() => {});
     coutService.parVehicule({ ...params, type_cout: "DISTANCE", limit: 10 }).then(setTopKm).catch(() => {});
@@ -142,6 +144,7 @@ export default function DashboardPage() {
   ];
   const repartitionType = aggregateCount(vehicules, v => v.type_vehicule);
   const coutMaintenanceTotal = evolutionMaintenance.reduce((s, p) => s + p.total, 0);
+  const coutReparationTotal  = evolutionReparation.reduce((s, p) => s + p.total, 0);
 
   const setDraftFilter = (key: keyof CoutsFilters, value: string) => {
     setDraft(f => {
@@ -189,16 +192,21 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Flotte */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-5">
-        <KpiCard label="Total véhicules"      value={totalVehicules}            icon={<Car size={20}/>}      bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="En service"           value={enServiceCount}            icon={<CheckCircle size={20}/>} bg="bg-emerald-100"  text="text-emerald-600" />
-        <KpiCard label="En maintenance"       value={enMaintenanceCount}        icon={<Wrench size={20}/>}   bg="bg-amber-100"      text="text-amber-600" />
-        <KpiCard label="Immobilisés"          value={immobilisesCount}          icon={<Ban size={20}/>}      bg="bg-rose-100"       text="text-rose-600" />
-        <KpiCard label="Taux disponibilité"   value={tauxDisponibilite} suffix="%" icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" valueColor="text-amber-600" />
-        <KpiCard label="Valeur flotte (FCFA)" value={kpi?.cout_total ?? 0}      icon={<Wallet size={20}/>}   bg="bg-emerald-100"    text="text-emerald-600" valueColor="text-amber-600" />
-        <KpiCard label="Coût carburant"       value={kpi?.cout_carburant ?? 0}  icon={<Fuel size={20}/>}     bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="Coût maintenance"     value={coutMaintenanceTotal}      icon={<Wrench size={20}/>}   bg="bg-rose-100"       text="text-rose-600" valueColor="text-rose-600" />
+      {/* KPI Flotte — statuts */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
+        <KpiCard label="Total véhicules"    value={totalVehicules}    icon={<Car size={20}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
+        <KpiCard label="En service"         value={enServiceCount}    icon={<CheckCircle size={20}/>} bg="bg-emerald-100"     text="text-emerald-600" />
+        <KpiCard label="En maintenance"     value={enMaintenanceCount} icon={<Wrench size={20}/>}    bg="bg-amber-100"       text="text-amber-600" />
+        <KpiCard label="Immobilisés"        value={immobilisesCount}  icon={<Ban size={20}/>}         bg="bg-rose-100"        text="text-rose-600" />
+        <KpiCard label="Taux disponibilité" value={tauxDisponibilite} suffix="%" icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" valueColor="text-amber-600" />
+      </div>
+
+      {/* KPI Coûts */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+        <KpiCard label="Valeur flotte (FCFA)"  value={kpi?.cout_total ?? 0}     icon={<Wallet size={20}/>}  bg="bg-emerald-100"     text="text-emerald-600" valueColor="text-amber-600" />
+        <KpiCard label="Coût carburant (FCFA)" value={kpi?.cout_carburant ?? 0} icon={<Fuel size={20}/>}    bg="bg-camublue-900/10" text="text-camublue-900" />
+        <KpiCard label="Coût entretien (FCFA)" value={coutMaintenanceTotal}     icon={<Wrench size={20}/>}  bg="bg-amber-100"       text="text-amber-600" valueColor="text-amber-600" />
+        <KpiCard label="Coût réparation (FCFA)" value={coutReparationTotal}     icon={<Wrench size={20}/>}  bg="bg-rose-100"        text="text-rose-600"  valueColor="text-rose-600" />
       </div>
 
       {/* KPI Carburant */}
@@ -218,55 +226,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Liste des véhicules */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-5">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-camublue-900">Liste des véhicules {vehicules.length > 10 ? "(extrait)" : ""}</h2>
-        </div>
-        {vehicules.length === 0 ? (
-          <p className="text-sm text-gray-400 p-6 text-center">Aucune donnée — importez le fichier Excel dans le module Flottes.</p>
-        ) : (
-          <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
-            <table className="w-full text-sm">
-              <thead className="bg-camublue-900 text-white text-xs uppercase sticky top-0 z-10">
-                <tr>
-                  <th className="text-left px-4 py-2.5 font-semibold">N°</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Immatriculation</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Marque</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Modèle</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Type</th>
-                  <th className="text-center px-4 py-2.5 font-semibold whitespace-nowrap">Année</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Statut</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Chauffeur</th>
-                  <th className="text-right px-4 py-2.5 font-semibold whitespace-nowrap">Kilométrage</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Dernier service</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Prochaine vidange</th>
-                  <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Localisation</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {vehicules.slice(0, 10).map((v, i) => (
-                  <tr key={v.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
-                    <td className="px-4 py-2.5 font-semibold text-camublue-900 whitespace-nowrap">{v.plaque_immatriculation}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{v.marque || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{v.modele || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{v.type_vehicule || "—"}</td>
-                    <td className="px-4 py-2.5 text-center text-gray-600 whitespace-nowrap">{v.annee ?? "—"}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{statutBadge(v.statut)}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{v.chauffeur || "—"}</td>
-                    <td className="px-4 py-2.5 text-right text-gray-600 whitespace-nowrap">{v.kilometrage != null ? `${v.kilometrage.toLocaleString("fr-FR")} km` : "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{v.dernier_service || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{v.prochaine_vidange || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{v.localisation || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       {/* Graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
