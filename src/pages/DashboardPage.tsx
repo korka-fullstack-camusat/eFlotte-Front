@@ -1,9 +1,33 @@
 import { useEffect, useState } from "react";
-import { CheckCircle, Wallet, Fuel, BarChart2, Ban, Filter, X, Car, Wrench } from "lucide-react";
+import { CheckCircle, Wallet, Fuel, BarChart2, Ban, Filter, X, Car, Wrench, Route, DollarSign, Droplets } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { vehiculeService, coutService } from "@/services/api";
+import axios from "axios";
 import type { Vehicule, KpiCouts, EvolutionPoint, VehiculeCoutPoint, FiltresCouts, CoutsFilters } from "@/types";
 import { KpiCard, MiniLineChart, MiniBarChart, DonutChart, BarRow } from "@/components/charts";
+
+interface VehiculeStats {
+  total: number;
+  en_service: number;
+  en_maintenance: number;
+  immobilises: number;
+  taux_disponibilite: number;
+  essence: number;
+  gasoil: number;
+}
+
+interface CarburantStats {
+  total_vehicules: number;
+  total_litres: number;
+  total_montant: number;
+  total_distance: number;
+  nb_gazoil: number;
+  nb_essence: number;
+  litres_gazoil: number;
+  litres_essence: number;
+  montant_gazoil: number;
+  montant_essence: number;
+}
 
 function normStatut(s: string | null | undefined): string {
   return (s || "")
@@ -71,6 +95,8 @@ function TopList({ items, unit }: { items: VehiculeCoutPoint[]; unit?: string })
 
 export default function DashboardPage() {
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
+  const [vehiculeStats, setVehiculeStats] = useState<VehiculeStats | null>(null);
+  const [carburantStats, setCarburantStats] = useState<CarburantStats | null>(null);
   const [kpi, setKpi] = useState<KpiCouts | null>(null);
   const [evolutionCarburant, setEvolutionCarburant] = useState<EvolutionPoint[]>([]);
   const [evolutionMaintenance, setEvolutionMaintenance] = useState<EvolutionPoint[]>([]);
@@ -85,6 +111,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     vehiculeService.getAll().then(setVehicules).catch(() => {});
+    axios.get("/api/vehicules/stats").then(r => setVehiculeStats(r.data)).catch(() => {});
+    axios.get("/api/carburant/stats").then(r => setCarburantStats(r.data)).catch(() => {});
     coutService.filtres().then(setFiltres).catch(() => {});
   }, []);
 
@@ -100,15 +128,16 @@ export default function DashboardPage() {
     coutService.parVehicule({ ...params, type_cout: "REP", limit: 10 }).then(setTopReparation).catch(() => {});
   }, [filters]);
 
-  const enServiceCount = vehicules.filter(v => normStatut(v.statut) === "EN_SERVICE").length;
-  const enMaintenanceCount = vehicules.filter(v => normStatut(v.statut) === "EN_MAINTENANCE").length;
-  const immobilisesCount = vehicules.filter(v => normStatut(v.statut).startsWith("IMMOBILISE")).length;
-  const nonRenseigneCount = vehicules.length - enServiceCount - enMaintenanceCount - immobilisesCount;
-  const tauxDisponibilite = vehicules.length > 0 ? Math.round((enServiceCount / vehicules.length) * 100) : 0;
+  const enServiceCount     = vehiculeStats?.en_service     ?? vehicules.filter(v => normStatut(v.statut) === "EN_SERVICE").length;
+  const enMaintenanceCount = vehiculeStats?.en_maintenance ?? vehicules.filter(v => normStatut(v.statut) === "EN_MAINTENANCE").length;
+  const immobilisesCount   = vehiculeStats?.immobilises    ?? vehicules.filter(v => normStatut(v.statut).startsWith("IMMOBILISE")).length;
+  const tauxDisponibilite  = vehiculeStats?.taux_disponibilite ?? (vehicules.length > 0 ? Math.round((enServiceCount / vehicules.length) * 100) : 0);
+  const totalVehicules     = vehiculeStats?.total ?? vehicules.length;
+  const nonRenseigneCount  = totalVehicules - enServiceCount - enMaintenanceCount - immobilisesCount;
   const repartitionStatut = [
-    { label: "En service", value: enServiceCount },
+    { label: "En service",    value: enServiceCount },
     { label: "En maintenance", value: enMaintenanceCount },
-    { label: "Immobilisés", value: immobilisesCount },
+    { label: "Immobilisés",   value: immobilisesCount },
     ...(nonRenseigneCount > 0 ? [{ label: "Non renseigné", value: nonRenseigneCount }] : []),
   ];
   const repartitionType = aggregateCount(vehicules, v => v.type_vehicule);
@@ -138,7 +167,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <h2 className="text-lg sm:text-xl font-extrabold tracking-tight uppercase">
-              Gestion de parc automobile — {vehicules.length} véhicule{vehicules.length > 1 ? "s" : ""}
+              Gestion de parc automobile — {totalVehicules} véhicule{totalVehicules > 1 ? "s" : ""}
             </h2>
             <p className="text-white/70 text-xs sm:text-sm mt-0.5">P.A.R.C-CAM — Logistique &amp; flotte</p>
           </div>
@@ -160,17 +189,35 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI */}
+      {/* KPI Flotte */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-5">
-        <KpiCard label="Total véhicules" value={vehicules.length} icon={<Car size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="En service" value={enServiceCount} icon={<CheckCircle size={20}/>} bg="bg-emerald-100" text="text-emerald-600" />
-        <KpiCard label="En maintenance" value={enMaintenanceCount} icon={<Wrench size={20}/>} bg="bg-amber-100" text="text-amber-600" />
-        <KpiCard label="Immobilisés" value={immobilisesCount} icon={<Ban size={20}/>} bg="bg-rose-100" text="text-rose-600" />
-        <KpiCard label="Taux disponibilité" value={tauxDisponibilite} suffix="%" icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" valueColor="text-amber-600" />
-        <KpiCard label="Valeur flotte (FCFA)" value={kpi?.cout_total ?? 0} icon={<Wallet size={20}/>} bg="bg-emerald-100" text="text-emerald-600" valueColor="text-amber-600" />
-        <KpiCard label="Coût carburant (FCFA)" value={kpi?.cout_carburant ?? 0} icon={<Fuel size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="Coût maintenance (FCFA)" value={coutMaintenanceTotal} icon={<Wrench size={20}/>} bg="bg-rose-100" text="text-rose-600" valueColor="text-rose-600" />
+        <KpiCard label="Total véhicules"      value={totalVehicules}            icon={<Car size={20}/>}      bg="bg-camublue-900/10" text="text-camublue-900" />
+        <KpiCard label="En service"           value={enServiceCount}            icon={<CheckCircle size={20}/>} bg="bg-emerald-100"  text="text-emerald-600" />
+        <KpiCard label="En maintenance"       value={enMaintenanceCount}        icon={<Wrench size={20}/>}   bg="bg-amber-100"      text="text-amber-600" />
+        <KpiCard label="Immobilisés"          value={immobilisesCount}          icon={<Ban size={20}/>}      bg="bg-rose-100"       text="text-rose-600" />
+        <KpiCard label="Taux disponibilité"   value={tauxDisponibilite} suffix="%" icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" valueColor="text-amber-600" />
+        <KpiCard label="Valeur flotte (FCFA)" value={kpi?.cout_total ?? 0}      icon={<Wallet size={20}/>}   bg="bg-emerald-100"    text="text-emerald-600" valueColor="text-amber-600" />
+        <KpiCard label="Coût carburant"       value={kpi?.cout_carburant ?? 0}  icon={<Fuel size={20}/>}     bg="bg-camublue-900/10" text="text-camublue-900" />
+        <KpiCard label="Coût maintenance"     value={coutMaintenanceTotal}      icon={<Wrench size={20}/>}   bg="bg-rose-100"       text="text-rose-600" valueColor="text-rose-600" />
       </div>
+
+      {/* KPI Carburant */}
+      {carburantStats && (
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-5 bg-camublue-900 rounded-full" />
+            <h2 className="text-sm font-bold text-camublue-900 uppercase tracking-wide">Carburant — Résumé global</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <KpiCard label="Véhicules suivis"   value={carburantStats.total_vehicules} icon={<Car size={20}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
+            <KpiCard label="Total litres"        value={carburantStats.total_litres}   suffix=" L" icon={<Droplets size={20}/>} bg="bg-blue-50" text="text-blue-700" />
+            <KpiCard label="Coût total (FCFA)"   value={carburantStats.total_montant}  icon={<DollarSign size={20}/>}  bg="bg-green-50" text="text-green-700" />
+            <KpiCard label="Distance totale"     value={carburantStats.total_distance} suffix=" km" icon={<Route size={20}/>}   bg="bg-amber-50" text="text-amber-700" />
+            <KpiCard label="Gazoil (L)"          value={carburantStats.litres_gazoil}  icon={<Fuel size={20}/>}        bg="bg-camublue-900/10" text="text-camublue-900" />
+            <KpiCard label="Essence (L)"         value={carburantStats.litres_essence} icon={<Fuel size={20}/>}        bg="bg-orange-50" text="text-orange-600" />
+          </div>
+        </div>
+      )}
 
       {/* Liste des véhicules */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-5">
