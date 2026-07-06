@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { CheckCircle, Wallet, Fuel, BarChart2, Ban, Filter, X, Car, Wrench, Route, DollarSign, Droplets } from "lucide-react";
+import { CheckCircle, Wallet, Fuel, BarChart2, Filter, X, Car, Wrench, Route, DollarSign, Droplets } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
+  Tooltip as RTooltip, Cell,
+} from "recharts";
 import AppLayout from "@/components/layout/AppLayout";
 import { vehiculeService, coutService } from "@/services/api";
 import axios from "axios";
 import type { Vehicule, KpiCouts, EvolutionPoint, VehiculeCoutPoint, FiltresCouts, CoutsFilters } from "@/types";
-import { KpiCard, MiniLineChart, MiniBarChart, DonutChart, BarRow } from "@/components/charts";
+import { KpiCard, MiniLineChart, MiniBarChart, DonutChart } from "@/components/charts";
 
 interface VehiculeStats {
   total: number;
@@ -70,27 +74,35 @@ function aggregateCount<T>(items: T[], getKey: (item: T) => string | null | unde
     .map(([label, value]) => ({ label, value }));
 }
 
-const RANK_COLORS = ["bg-camublue-900", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-violet-500", "bg-cyan-500", "bg-lime-500", "bg-pink-500", "bg-indigo-500", "bg-orange-500"];
+const RANK_COLORS = ["#1e3a5f","#10b981","#f59e0b","#f43f5e","#8b5cf6","#06b6d4","#84cc16","#ec4899","#6366f1","#f97316"];
+
+function TopBarChart({ items, unit, color }: { items: VehiculeCoutPoint[]; unit?: string; color?: string }) {
+  if (items.length === 0) {
+    return <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>;
+  }
+  const data = items.map(it => ({ name: it.plaque_immatriculation, value: it.total }));
+  const fmt = (v: number) => unit === "km" ? `${v.toLocaleString("fr-FR")} km` : `${v.toLocaleString("fr-FR")} FCFA`;
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(200, items.length * 34)}>
+      <BarChart data={data} layout="vertical" margin={{ left: 4, right: 60, top: 4, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+        <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v/1_000).toFixed(0)}k` : String(v)} />
+        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+        <RTooltip formatter={(v: number) => [fmt(v), ""]} />
+        <Bar dataKey="value" radius={[0, 4, 4, 0]}
+          label={{ position: "right", fontSize: 10, fill: "#6b7280", formatter: (v: number) => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v/1_000).toFixed(0)}k` : String(v) }}>
+          {data.map((_, i) => <Cell key={i} fill={color ?? RANK_COLORS[i % RANK_COLORS.length]} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
 
 function TopList({ items, unit }: { items: VehiculeCoutPoint[]; unit?: string }) {
   if (items.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>;
   }
-  const max = Math.max(1, ...items.map(i => i.total));
-  return (
-    <div className="space-y-3">
-      {items.map((it, i) => (
-        <BarRow
-          key={it.plaque_immatriculation}
-          label={`${i + 1}. ${it.plaque_immatriculation}`}
-          value={it.total}
-          max={max}
-          unit={unit}
-          color={RANK_COLORS[i % RANK_COLORS.length]}
-        />
-      ))}
-    </div>
-  );
+  return <TopBarChart items={items} unit={unit} />;
 }
 
 export default function DashboardPage() {
@@ -193,11 +205,10 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Flotte — statuts */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
         <KpiCard label="Total véhicules"    value={totalVehicules}    icon={<Car size={20}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
         <KpiCard label="En service"         value={enServiceCount}    icon={<CheckCircle size={20}/>} bg="bg-emerald-100"     text="text-emerald-600" />
         <KpiCard label="En maintenance"     value={enMaintenanceCount} icon={<Wrench size={20}/>}    bg="bg-amber-100"       text="text-amber-600" />
-        <KpiCard label="Immobilisés"        value={immobilisesCount}  icon={<Ban size={20}/>}         bg="bg-rose-100"        text="text-rose-600" />
         <KpiCard label="Taux disponibilité" value={tauxDisponibilite} suffix="%" icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" valueColor="text-amber-600" />
       </div>
 
@@ -266,15 +277,25 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Top 10 classements */}
+      {/* Top 10 carburant — graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-bold text-camublue-900 mb-4">Top 10 — Consommation Essence (FCFA)</h2>
-          <TopList items={topEssence} />
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-3 h-3 rounded-full bg-orange-400 shrink-0" />
+            <h2 className="text-sm font-bold text-camublue-900">Top 10 — Consommation Essence (FCFA)</h2>
+          </div>
+          {topEssence.length === 0
+            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>
+            : <TopBarChart items={topEssence} color="#f97316" />}
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-bold text-camublue-900 mb-4">Top 10 — Consommation Gasoil (FCFA)</h2>
-          <TopList items={topGasoil} />
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-3 h-3 rounded-full bg-camublue-900 shrink-0" />
+            <h2 className="text-sm font-bold text-camublue-900">Top 10 — Consommation Gasoil (FCFA)</h2>
+          </div>
+          {topGasoil.length === 0
+            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>
+            : <TopBarChart items={topGasoil} color="#1e3a5f" />}
         </div>
       </div>
 

@@ -125,33 +125,67 @@ export function MiniBarChart({ points, color = "#1e3a5f" }: { points: { mois: nu
   );
 }
 
+function fmtY(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
+  return String(Math.round(v));
+}
+
 export function MiniLineChart({ points }: { points: { mois: number; total: number }[] }) {
-  const width = 600;
-  const height = 180;
-  const padding = 30;
+  const width = 620;
+  const height = 200;
+  const paddingLeft = 72;
+  const paddingRight = 20;
+  const paddingTop = 16;
+  const paddingBottom = 28;
+
   const max = Math.max(1, ...points.map(p => p.total));
   const data = Array.from({ length: 12 }, (_, i) => {
     const found = points.find(p => p.mois === i + 1);
     return found ? found.total : 0;
   });
 
-  const stepX = (width - padding * 2) / 11;
-  const coords = data.map((v, i) => {
-    const x = padding + i * stepX;
-    const y = height - padding - (v / max) * (height - padding * 2);
-    return { x, y, v };
-  });
-  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x} ${c.y}`).join(" ");
+  const chartW = width - paddingLeft - paddingRight;
+  const chartH = height - paddingTop - paddingBottom;
+  const stepX = chartW / 11;
+
+  const toX = (i: number) => paddingLeft + i * stepX;
+  const toY = (v: number) => paddingTop + chartH - (v / max) * chartH;
+
+  const coords = data.map((v, i) => ({ x: toX(i), y: toY(v), v }));
+  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+
+  const Y_TICKS = 5;
+  const yTicks = Array.from({ length: Y_TICKS + 1 }, (_, i) => (max / Y_TICKS) * i);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-44">
-      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e5e7eb" />
-      <path d={path} fill="none" stroke="#1e3a5f" strokeWidth={2.5} />
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-48">
+      {/* Y-axis gridlines + labels */}
+      {yTicks.map((v, i) => {
+        const y = toY(v);
+        return (
+          <g key={i}>
+            <line x1={paddingLeft} y1={y} x2={width - paddingRight} y2={y}
+              stroke="#e5e7eb" strokeDasharray={i === 0 ? "0" : "4 3"} />
+            <text x={paddingLeft - 6} y={y + 4} fontSize={10} textAnchor="end" fill="#9ca3af">
+              {fmtY(v)}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Y-axis line */}
+      <line x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={paddingTop + chartH} stroke="#d1d5db" />
+
+      {/* Line + dots */}
+      <path d={path} fill="none" stroke="#1e3a5f" strokeWidth={2.5} strokeLinejoin="round" />
       {coords.map((c, i) => (
-        <circle key={i} cx={c.x} cy={c.y} r={3} fill="#1e3a5f" />
+        <circle key={i} cx={c.x} cy={c.y} r={3.5} fill="#1e3a5f" />
       ))}
+
+      {/* X-axis labels */}
       {coords.map((c, i) => (
-        <text key={i} x={c.x} y={height - padding + 16} fontSize={10} textAnchor="middle" fill="#9ca3af">
+        <text key={i} x={c.x} y={height - paddingBottom + 16} fontSize={10} textAnchor="middle" fill="#9ca3af">
           {MOIS_LABELS[i]}
         </text>
       ))}
