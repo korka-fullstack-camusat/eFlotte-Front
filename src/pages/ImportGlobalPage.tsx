@@ -264,6 +264,7 @@ export default function ImportGlobalPage() {
   const [result, setResult]   = useState<ImportResult | null>(null);
   const [sinistreResult, setSinistreResult] = useState<{ created: number; updated: number; errors: any[] } | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -318,8 +319,10 @@ export default function ImportGlobalPage() {
         axios.get<HistoryEntry[]>("/api/import-global/history").then(r => setHistory(r.data)).catch(() => {});
       }
     } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? "Erreur lors de l'import";
       setStatus("error");
-      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
+      setErrorMsg(msg);
+      toast.error(msg);
     }
   };
 
@@ -330,7 +333,7 @@ export default function ImportGlobalPage() {
   };
 
   const reset = () => {
-    setMode(null); setStatus("idle"); setResult(null); setSinistreResult(null); setFileName(null);
+    setMode(null); setStatus("idle"); setResult(null); setSinistreResult(null); setFileName(null); setErrorMsg("");
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -654,7 +657,9 @@ export default function ImportGlobalPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-700">L'import a échoué</p>
-                  <p className="text-sm text-gray-400 mt-1">Vérifiez que le fichier est le bon tableau de bord Excel.</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {errorMsg || "Vérifiez que le fichier est le bon tableau de bord Excel."}
+                  </p>
                 </div>
                 <button onClick={reset} className="px-5 py-2.5 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition">Nouvel import</button>
               </div>
