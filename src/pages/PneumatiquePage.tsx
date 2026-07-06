@@ -11,7 +11,6 @@ import { pneumatiqueService } from "@/services/api";
 import type { Pneumatique, FiltresPneumatiques, PneumatiquesFilters } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const EMPTY = {
   fournisseur: "", type_location: "", immatriculation: "", chauffeur: "", kilometrage: "",
@@ -42,6 +41,7 @@ export default function PneumatiquePage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const [filtres, setFiltres] = useState<FiltresPneumatiques | null>(null);
   const [filters, setFilters] = useState<PneumatiquesFilters>({});
@@ -97,7 +97,7 @@ export default function PneumatiquePage() {
 
   const load = () => {
     setLoading(true);
-    pneumatiqueService.getAll({ ...filters, page, page_size: PAGE_SIZE })
+    pneumatiqueService.getAll({ ...filters, page, page_size: pageSize })
       .then(res => { setItems(res.items); setTotal(res.total); })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -117,7 +117,7 @@ export default function PneumatiquePage() {
     setAllItems(applyChartFilter(rawChartItems, chartFilter, r => r.date_prevue));
   }, [chartFilter]);
 
-  useEffect(() => { load(); }, [page, filters]);
+  useEffect(() => { load(); }, [page, filters, pageSize]);
   useEffect(() => { pneumatiqueService.filtres().then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { setPage(1); }, [filters]);
 
@@ -384,7 +384,7 @@ export default function PneumatiquePage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {showExport && (

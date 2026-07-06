@@ -11,7 +11,6 @@ import { coutService } from "@/services/api";
 import type { CoutFlotte, FiltresCouts, CoutsFilters } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const TYPE_COUT_OPTIONS = ["TOTAL", "CARBURANT", "DISTANCE", "ASS", "ENT", "LOCAT", "PEA", "REP"];
 
@@ -60,6 +59,7 @@ export default function DataFlottesPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [filtres, setFiltres] = useState<FiltresCouts | null>(null);
   const [filters, setFilters] = useState<CoutsFilters & { type_cout?: string }>({});
   const [filterModal, setFilterModal] = useState(false);
@@ -84,13 +84,13 @@ export default function DataFlottesPage() {
 
   const load = () => {
     setLoading(true);
-    coutService.getAll({ ...filters, page, page_size: PAGE_SIZE })
+    coutService.getAll({ ...filters, page, page_size: pageSize })
       .then(res => { setItems(res.items); setTotal(res.total); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [page, filters]);
+  useEffect(() => { load(); }, [page, filters, pageSize]);
   useEffect(() => { coutService.filtres().then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { setPage(1); }, [filters]);
 
@@ -311,7 +311,7 @@ export default function DataFlottesPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Graphiques ═══════════════════════════════════════════════ */}

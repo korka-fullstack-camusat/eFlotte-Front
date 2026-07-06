@@ -14,7 +14,6 @@ import { checklistVLService } from "@/services/api";
 import type { CheckListVL, FiltresCheckListVL, CheckListVLFilters } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const EMPTY = {
   brand: "", model: "", plaque_immatriculation: "", label: "", car_group: "",
@@ -46,6 +45,7 @@ export default function CheckListsVLPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [semaines, setSemaines] = useState<string[]>([]);
   const [statuts, setStatuts] = useState<string[]>([]);
 
@@ -70,13 +70,13 @@ export default function CheckListsVLPage() {
 
   const load = () => {
     setLoading(true);
-    checklistVLService.getAll({ ...filters, page, page_size: PAGE_SIZE })
+    checklistVLService.getAll({ ...filters, page, page_size: pageSize })
       .then(res => { setItems(res.items); setTotal(res.total); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [page, filters]);
+  useEffect(() => { load(); }, [page, filters, pageSize]);
   useEffect(() => { checklistVLService.filtres().then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { checklistVLService.semaines().then(setSemaines).catch(() => {}); }, []);
   useEffect(() => { checklistVLService.statuts().then(setStatuts).catch(() => {}); }, []);
@@ -305,7 +305,7 @@ export default function CheckListsVLPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Filtres ══════════════════════════════════════════════════ */}

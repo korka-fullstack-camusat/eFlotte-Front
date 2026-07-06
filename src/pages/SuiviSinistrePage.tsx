@@ -17,7 +17,6 @@ import { suiSinistreService } from "@/services/api";
 import type { SuiviSinistre, SinistresFilters } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const EMPTY: Partial<SuiviSinistre> = {
   date_sinistre: null, date_declaration: null, type_location: "",
@@ -104,6 +103,7 @@ export default function SuiviSinistrePage() {
   const [loading, setLoading] = useState(true);
 
   const [page, setPage]     = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [filters, setFilters] = useState<SinistresFilters>({});
   const [search, setSearch]   = useState("");
   const [showFilters, setShowFilters]   = useState(false);
@@ -124,11 +124,11 @@ export default function SuiviSinistrePage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    suiSinistreService.getAll({ ...filters, search: search || undefined, page, page_size: PAGE_SIZE })
+    suiSinistreService.getAll({ ...filters, search: search || undefined, page, page_size: pageSize })
       .then(r => { setItems(r.items); setTotal(r.total); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [filters, search, page]);
+  }, [filters, search, page, pageSize]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [filters, search]);
@@ -397,7 +397,7 @@ export default function SuiviSinistrePage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Filtres ══════════════════════════════════════════════════ */}

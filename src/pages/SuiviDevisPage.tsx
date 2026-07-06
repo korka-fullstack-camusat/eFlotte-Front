@@ -14,7 +14,6 @@ import { suiviDevisService } from "@/services/api";
 import type { SuiviDevis, FiltresDevis, DevisFilters } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const EMPTY = {
   descriptions: "", numero_devis: "", valeur_devis: "", date: "", montant: "",
@@ -45,6 +44,7 @@ export default function SuiviDevisPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const [filtres, setFiltres] = useState<FiltresDevis | null>(null);
   const [filters, setFilters] = useState<DevisFilters>({});
@@ -67,13 +67,13 @@ export default function SuiviDevisPage() {
 
   const load = () => {
     setLoading(true);
-    suiviDevisService.getAll({ ...filters, page, page_size: PAGE_SIZE })
+    suiviDevisService.getAll({ ...filters, page, page_size: pageSize })
       .then(res => { setItems(res.items); setTotal(res.total); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [page, filters]);
+  useEffect(() => { load(); }, [page, filters, pageSize]);
   useEffect(() => { suiviDevisService.filtres().then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { setPage(1); }, [filters]);
 
@@ -341,7 +341,7 @@ export default function SuiviDevisPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Filtres ══════════════════════════════════════════════════ */}

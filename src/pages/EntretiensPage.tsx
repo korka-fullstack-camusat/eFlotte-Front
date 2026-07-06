@@ -14,7 +14,6 @@ import { entretienService } from "@/services/api";
 import type { EntretienVehicule } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const EMPTY: Partial<EntretienVehicule> = {
   type_location: "", fournisseur: "", type_vehicule: "", plaque_immatriculation: "",
@@ -31,6 +30,7 @@ export default function EntretiensPage() {
   const [form, setForm] = useState<Partial<EntretienVehicule>>(EMPTY);
 
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [manageRow, setManageRow] = useState<EntretienVehicule | null>(null);
   const [search, setSearch] = useState("");
   const [chartFilter, setChartFilter] = useState<ChartFilter>(CHART_FILTER_EMPTY);
@@ -71,8 +71,8 @@ export default function EntretiensPage() {
       .some(v => (v ?? "").toLowerCase().includes(q));
   });
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pagedEntretiens = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedEntretiens = filtered.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
   useEffect(() => { setPage(1); }, [search, filters]);
 
@@ -286,7 +286,7 @@ export default function EntretiensPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Ajout/Édition ════════════════════════════════════════════ */}

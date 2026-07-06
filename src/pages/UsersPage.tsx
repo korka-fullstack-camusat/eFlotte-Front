@@ -8,7 +8,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/services/api";
 import type { UserAccount } from "@/types";
 
-const PAGE_SIZE = 10;
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrateur",
@@ -26,6 +25,7 @@ export default function UsersPage() {
   const [editing, setEditing] = useState<UserAccount | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const load = () => {
     setLoading(true);
@@ -34,8 +34,8 @@ export default function UsersPage() {
 
   useEffect(() => { load(); }, []);
 
-  const pageCount = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
-  const pagedUsers = users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(users.length / pageSize));
+  const pagedUsers = users.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
 
   const openCreate = () => { setEditing(null); setForm(EMPTY); setModal(true); };
@@ -141,7 +141,7 @@ export default function UsersPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={users.length} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={users.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Ajout/Édition ════════════════════════════════════════════ */}

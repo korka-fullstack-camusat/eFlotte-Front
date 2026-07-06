@@ -1,12 +1,15 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+const PAGE_SIZE_OPTIONS = [10, 15, 25, 50, 100];
+
 export default function Pagination({
-  page, pageSize, total, onPageChange,
+  page, pageSize, total, onPageChange, onPageSizeChange,
 }: {
   page: number;
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
 }) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   if (total === 0) return null;
@@ -20,9 +23,26 @@ export default function Pagination({
 
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-100 flex-wrap">
-      <p className="text-xs text-gray-500">
-        Affichage {start}–{end} sur {total}
-      </p>
+      <div className="flex items-center gap-3">
+        <p className="text-xs text-gray-500">
+          Affichage {start}–{end} sur {total}
+        </p>
+        {onPageSizeChange && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-400">Afficher</span>
+            <select
+              value={pageSize}
+              onChange={e => onPageSizeChange(Number(e.target.value))}
+              className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-camublue-900/30 cursor-pointer"
+            >
+              {PAGE_SIZE_OPTIONS.map(s => (
+                <option key={s} value={s}>{s} / page</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(page - 1)}

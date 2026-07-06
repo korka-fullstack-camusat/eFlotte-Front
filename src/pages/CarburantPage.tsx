@@ -166,7 +166,7 @@ export default function CarburantPage() {
   const [carGroup, setCarGroup] = useState("");
   const [typeCarb, setTypeCarb] = useState("");
   const [page, setPage]         = useState(1);
-  const PAGE_SIZE = 50;
+  const [pageSize, setPageSize] = useState(15);
 
   // Modaux
   const [showCharts,  setShowCharts]  = useState(false);
@@ -202,7 +202,7 @@ export default function CarburantPage() {
   }, [carGroup, typeCarb]);
 
   const fetchRows = useCallback(async (p = page) => {
-    const params: Record<string, string | number> = { page: p, page_size: PAGE_SIZE };
+    const params: Record<string, string | number> = { page: p, page_size: pageSize };
     if (search)   params.search    = search;
     if (carGroup) params.car_group = carGroup;
     if (typeCarb) params.type_carburant = typeCarb;
@@ -299,7 +299,7 @@ export default function CarburantPage() {
   const applyFilters    = () => { setCarGroup(draftGroup); setTypeCarb(draftType); setFilterModal(false); };
   const resetFilters    = () => { setDraftGroup(""); setDraftType(""); setCarGroup(""); setTypeCarb(""); setFilterModal(false); };
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const totalPages = Math.ceil(total / pageSize);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -429,7 +429,11 @@ export default function CarburantPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-gray-500">
               <span>Page {page} / {totalPages} — {total} véhicules</span>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 bg-white">
+                  {[10,15,25,50,100].map(s => <option key={s} value={s}>{s} / page</option>)}
+                </select>
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                   className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 transition">← Préc.</button>
                 <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}

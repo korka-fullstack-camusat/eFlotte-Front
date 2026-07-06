@@ -14,7 +14,6 @@ import { entretienBisService } from "@/services/api";
 import type { EntretienBis } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const EMPTY: Partial<EntretienBis> = {
   rt: "", statut: "", modele: "", plaque_immatriculation: "",
@@ -45,6 +44,7 @@ export default function EntretienBisPage() {
   const [chartFilter, setChartFilter] = useState<ChartFilter>(CHART_FILTER_EMPTY);
   const [showCharts, setShowCharts] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [manageRow, setManageRow] = useState<EntretienBis | null>(null);
   const [search, setSearch] = useState("");
 
@@ -83,8 +83,8 @@ export default function EntretienBisPage() {
       .some(v => (v ?? "").toLowerCase().includes(q));
   });
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pagedEntretiens = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedEntretiens = filtered.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
   useEffect(() => { setPage(1); }, [search, filters]);
 
@@ -327,7 +327,7 @@ export default function EntretienBisPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Filtres ══════════════════════════════════════════ */}

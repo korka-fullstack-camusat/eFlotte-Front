@@ -11,7 +11,6 @@ import { missionChauffeurService } from "@/services/api";
 import type { MissionChauffeur, FiltresMissions, MissionsFilters } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } from "@/components/ChartFilterBar";
 
-const PAGE_SIZE = 10;
 
 const EMPTY = {
   date: "", immatriculation: "", chauffeur: "", demandeur: "", telephone: "",
@@ -44,6 +43,7 @@ export default function ChauffeurPolesPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const [filtres, setFiltres] = useState<FiltresMissions | null>(null);
   const [filters, setFilters] = useState<MissionsFilters>({});
@@ -106,7 +106,7 @@ export default function ChauffeurPolesPage() {
 
   const load = () => {
     setLoading(true);
-    missionChauffeurService.getAll({ ...filters, page, page_size: PAGE_SIZE })
+    missionChauffeurService.getAll({ ...filters, page, page_size: pageSize })
       .then(res => { setItems(res.items); setTotal(res.total); })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -126,7 +126,7 @@ export default function ChauffeurPolesPage() {
     setAllItems(applyChartFilter(rawChartItems, chartFilter, r => r.date));
   }, [chartFilter]);
 
-  useEffect(() => { load(); }, [page, filters]);
+  useEffect(() => { load(); }, [page, filters, pageSize]);
   useEffect(() => { missionChauffeurService.filtres().then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { setPage(1); }, [filters]);
 
@@ -356,7 +356,7 @@ export default function ChauffeurPolesPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        <Pagination page={page} pageSize={pageSize} total={total} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Gérer (IMMA) ══════════════════════════════════════════════ */}
