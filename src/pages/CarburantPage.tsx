@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import {
   Upload, Fuel, TrendingUp, DollarSign, Route,
-  X, Search, BarChart2, Filter, Pencil,
+  X, Search, BarChart2, Filter, Pencil, Calendar, ChevronDown,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -19,6 +19,7 @@ import ChartFilterBar, {
 interface CarburantRow {
   id: number;
   matricule: string;
+  mois: number;
   quantite_totale: number | null;
   montant_total: number | null;
   mt_ht: number | null;
@@ -61,6 +62,11 @@ type EditableField = "quantite_totale" | "montant_total" | "mt_ht" | "prix_unita
   | "dernier_plein" | "driver_name" | "nom_chauffeur" | "code_projet" | "num_carte";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const MOIS_NOMS = [
+  "Janvier","Février","Mars","Avril","Mai","Juin",
+  "Juillet","Août","Septembre","Octobre","Novembre","Décembre",
+];
 
 function fmt(n: number | null | undefined, decimals = 0): string {
   if (n == null) return "—";
@@ -123,8 +129,6 @@ const FIELD_META: Record<EditableField, { label: string; type: "text" | "number"
   num_carte:       { label: "N° carte",             type: "text"   },
 };
 
-// ── Calcul graphes à partir des lignes brutes ────────────────────────────────
-
 function computeChartData(rows: CarburantRow[]) {
   const consomMap = new Map<string, number>();
   const coutMap   = new Map<string, number>();
@@ -138,53 +142,47 @@ function computeChartData(rows: CarburantRow[]) {
     if (t === "ESSENCE") { litresEssence += r.quantite_totale ?? 0; montantEssence += r.montant_total ?? 0; }
   }
 
-  const consomData = [...consomMap.entries()]
-    .sort((a, b) => b[1] - a[1]).slice(0, 10)
-    .map(([label, value]) => ({ label, value }));
-
-  const coutData = [...coutMap.entries()]
-    .sort((a, b) => b[1] - a[1]).slice(0, 10)
-    .map(([label, value]) => ({ label, value }));
-
+  const consomData = [...consomMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([label, value]) => ({ label, value }));
+  const coutData   = [...coutMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([label, value]) => ({ label, value }));
   const repartData = [
     { label: "Gazoil",  litres: litresGazoil,  montant: montantGazoil  },
     { label: "Essence", litres: litresEssence, montant: montantEssence },
   ];
-
   return { consomData, coutData, repartData };
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CarburantPage() {
-  const [rows, setRows]       = useState<CarburantRow[]>([]);
-  const [total, setTotal]     = useState(0);
-  const [stats, setStats]     = useState<Stats | null>(null);
+  const [selectedMois, setSelectedMois] = useState<number>(1);
+  const [moisOpen,     setMoisOpen]     = useState(false);
+
+  // Liste de référence : tous les matricules connus (toutes périodes confondues)
+  const [allMatricules, setAllMatricules] = useState<string[]>([]);
+  // Données du mois sélectionné, indexées par matricule
+  const [monthData,     setMonthData]     = useState<Map<string, CarburantRow>>(new Map());
+
+  const [stats,   setStats]   = useState<Stats | null>(null);
   const [filtres, setFiltres] = useState<Filtres | null>(null);
 
-  const [search, setSearch]     = useState("");
+  const [search,   setSearch]   = useState("");
   const [carGroup, setCarGroup] = useState("");
   const [typeCarb, setTypeCarb] = useState("");
-  const [page, setPage]         = useState(1);
+  const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
-  // Modaux
   const [showCharts,  setShowCharts]  = useState(false);
   const [filterModal, setFilterModal] = useState(false);
   const [detailRow,   setDetailRow]   = useState<CarburantRow | null>(null);
-  const [quickEdit,   setQuickEdit]   = useState<{
-    row: CarburantRow; field: EditableField; value: string;
-  } | null>(null);
+  const [quickEdit,   setQuickEdit]   = useState<{ row: CarburantRow; field: EditableField; value: string } | null>(null);
   const [quickSaving, setQuickSaving] = useState(false);
 
-  // Draft filtres
   const [draftGroup, setDraftGroup] = useState("");
   const [draftType,  setDraftType]  = useState("");
 
-  // Graphes
-  const [chartFilter,    setChartFilter]    = useState<ChartFilter>(CHART_FILTER_EMPTY);
-  const [allChartRows,   setAllChartRows]   = useState<CarburantRow[]>([]);
-  const [loadingCharts,  setLoadingCharts]  = useState(false);
+  const [chartFilter,   setChartFilter]   = useState<ChartFilter>(CHART_FILTER_EMPTY);
+  const [allChartRows,  setAllChartRows]  = useState<CarburantRow[]>([]);
+  const [loadingCharts, setLoadingCharts] = useState(false);
 
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -193,44 +191,78 @@ export default function CarburantPage() {
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
+  // Charge tous les matricules connus (toutes périodes) — liste de référence fixe
+  const fetchAllMatricules = async () => {
+    const { data } = await axios.get("/api/carburant", { params: { page: 1, page_size: 9999 } });
+    const unique = [...new Set<string>((data.items as CarburantRow[]).map(r => r.matricule))].sort();
+    setAllMatricules(unique);
+  };
+
   const fetchStats = useCallback(async () => {
-    const params: Record<string, string> = {};
+    const params: Record<string, string | number> = { mois: selectedMois };
     if (carGroup) params.car_group = carGroup;
     if (typeCarb) params.type_carburant = typeCarb;
     const { data } = await axios.get("/api/carburant/stats", { params });
     setStats(data);
-  }, [carGroup, typeCarb]);
+  }, [selectedMois, carGroup, typeCarb]);
 
-  const fetchRows = useCallback(async (p = page) => {
-    const params: Record<string, string | number> = { page: p, page_size: pageSize };
-    if (search)   params.search    = search;
+  // Charge les données du mois sélectionné et les indexe par matricule
+  const fetchMonthData = useCallback(async () => {
+    const params: Record<string, string | number> = { mois: selectedMois, page: 1, page_size: 9999 };
     if (carGroup) params.car_group = carGroup;
     if (typeCarb) params.type_carburant = typeCarb;
     const { data } = await axios.get("/api/carburant", { params });
-    setRows(data.items);
-    setTotal(data.total);
-  }, [page, search, carGroup, typeCarb]);
+    const map = new Map<string, CarburantRow>();
+    (data.items as CarburantRow[]).forEach(r => map.set(r.matricule, r));
+    setMonthData(map);
+  }, [selectedMois, carGroup, typeCarb]);
 
   const fetchFiltres = async () => {
     const { data } = await axios.get("/api/carburant/filtres");
     setFiltres(data);
   };
 
-  useEffect(() => { fetchFiltres(); }, []);
-
+  // Au montage : charger la liste de référence des matricules + filtres
   useEffect(() => {
-    setPage(1); fetchRows(1); fetchStats();
+    fetchAllMatricules();
+    fetchFiltres();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, carGroup, typeCarb]);
+  }, []);
 
-  useEffect(() => { fetchRows(page); /* eslint-disable-next-line */ }, [page]);
+  // À chaque changement de mois/filtres : recharger données du mois + stats
+  useEffect(() => {
+    setPage(1);
+    fetchMonthData();
+    fetchStats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMois, carGroup, typeCarb]);
 
-  // ── Ouverture modal graphes ───────────────────────────────────────────────
+  // Après un import : rafraîchir aussi la liste de référence
+  const refreshAll = async () => {
+    await Promise.all([fetchAllMatricules(), fetchMonthData(), fetchStats(), fetchFiltres()]);
+  };
+
+  // ── Vue paginée : filtre sur allMatricules + search ───────────────────────
+  const filteredMatricules = allMatricules.filter(m =>
+    !search || m.toLowerCase().includes(search.toLowerCase())
+  );
+  const totalPages  = Math.ceil(filteredMatricules.length / pageSize);
+  const pageSlice   = filteredMatricules.slice((page - 1) * pageSize, page * pageSize);
+  // Lignes affichées : matricule fixe + données du mois (ou vide si absent)
+  const displayRows: CarburantRow[] = pageSlice.map(m => monthData.get(m) ?? {
+    id: -1, matricule: m, mois: selectedMois,
+    quantite_totale: null, montant_total: null, mt_ht: null, prix_unitaire: null,
+    type_carburant: null, distance_totale: null, distance_gps: null,
+    car_group: null, dernier_plein: null, driver_name: null,
+    nom_chauffeur: null, code_projet: null, num_carte: null,
+  });
+
+  // ── Charts modal ─────────────────────────────────────────────────────────
 
   const openCharts = () => {
     setShowCharts(true);
     setLoadingCharts(true);
-    axios.get("/api/carburant", { params: { page: 1, page_size: 9999 } })
+    axios.get("/api/carburant", { params: { mois: selectedMois, page: 1, page_size: 9999 } })
       .then(({ data }) => setAllChartRows(data.items))
       .catch(() => {})
       .finally(() => setLoadingCharts(false));
@@ -248,14 +280,14 @@ export default function CarburantPage() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const { data } = await axios.post("/api/carburant/import", fd);
-      toast.success(`Import terminé : ${data.created} créés, ${data.updated} mis à jour`);
+      const { data } = await axios.post(`/api/carburant/import?mois=${selectedMois}`, fd);
+      toast.success(`Import ${MOIS_NOMS[selectedMois - 1]} : ${data.created} créés, ${data.updated} mis à jour`);
       if (data.errors?.length) {
         toast.error(`${data.errors.length} erreur(s) — voir console`, { duration: 6000 });
         console.warn("Erreurs import carburant:", data.errors);
       }
-      await Promise.all([fetchRows(1), fetchStats(), fetchFiltres()]);
       setPage(1);
+      await refreshAll();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
     } finally {
@@ -268,8 +300,7 @@ export default function CarburantPage() {
 
   const openQuickEdit = (row: CarburantRow, field: EditableField) => {
     const raw = row[field];
-    const value = raw == null ? "" : field === "dernier_plein"
-      ? String(raw).slice(0, 10) : String(raw);
+    const value = raw == null ? "" : field === "dernier_plein" ? String(raw).slice(0, 10) : String(raw);
     setQuickEdit({ row, field, value });
     setDetailRow(null);
   };
@@ -284,7 +315,11 @@ export default function CarburantPage() {
     try {
       const { data } = await axios.patch(`/api/carburant/${row.id}`, { [field]: parsed });
       toast.success("Mis à jour");
-      setRows(prev => prev.map(r => r.id === row.id ? { ...r, ...data } : r));
+      setMonthData(prev => {
+        const next = new Map(prev);
+        next.set(row.matricule, { ...row, ...data });
+        return next;
+      });
       setQuickEdit(null);
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Erreur");
@@ -293,28 +328,67 @@ export default function CarburantPage() {
     }
   };
 
-  // ── Filtres modal ─────────────────────────────────────────────────────────
+  // ── Filtres ───────────────────────────────────────────────────────────────
 
   const openFilterModal = () => { setDraftGroup(carGroup); setDraftType(typeCarb); setFilterModal(true); };
   const applyFilters    = () => { setCarGroup(draftGroup); setTypeCarb(draftType); setFilterModal(false); };
   const resetFilters    = () => { setDraftGroup(""); setDraftType(""); setCarGroup(""); setTypeCarb(""); setFilterModal(false); };
 
-  const totalPages = Math.ceil(total / pageSize);
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <AppLayout>
-      {/* Header */}
+      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="mb-8 sticky top-0 z-20 bg-camugray-100 -mx-4 px-4 md:-mx-8 md:px-8 pt-1 pb-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-camublue-900">Suivi Carburant</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              Consommation & coûts carburant — {total} véhicule{total !== 1 ? "s" : ""}
+              {MOIS_NOMS[selectedMois - 1]} — {filteredMatricules.length} véhicule{filteredMatricules.length !== 1 ? "s" : ""}
+              {monthData.size < allMatricules.length && (
+                <span className="ml-2 text-amber-500 text-xs">
+                  · {monthData.size} avec données
+                </span>
+              )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+
+            {/* ── Sélecteur de mois ─────────────────────────────────────── */}
+            <div className="relative">
+              <button
+                onClick={() => setMoisOpen(v => !v)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-camublue-900/40 text-camublue-900 rounded-xl text-sm font-semibold transition shadow-sm"
+              >
+                <Calendar size={15} />
+                <span>{MOIS_NOMS[selectedMois - 1]}</span>
+                <ChevronDown size={13} className={`transition-transform ${moisOpen ? "rotate-180" : ""}`} />
+              </button>
+              {moisOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-30 p-3 w-64">
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2 px-1">Choisir le mois</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {MOIS_NOMS.map((nom, i) => {
+                      const m = i + 1;
+                      return (
+                        <button
+                          key={m}
+                          onClick={() => { setSelectedMois(m); setMoisOpen(false); }}
+                          className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            selectedMois === m
+                              ? "bg-camublue-900 text-white"
+                              : "bg-gray-50 text-gray-600 hover:bg-camublue-900/10 hover:text-camublue-900"
+                          }`}
+                        >
+                          {nom}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button onClick={openCharts}
               className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
               <BarChart2 size={15} /><span>Voir graphiques</span>
@@ -331,7 +405,7 @@ export default function CarburantPage() {
             <button onClick={() => fileRef.current?.click()} disabled={importing}
               className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm disabled:opacity-60">
               <Upload size={15} />
-              {importing ? "Import en cours…" : "Importer Excel"}
+              {importing ? "Import en cours…" : `Importer — ${MOIS_NOMS[selectedMois - 1]}`}
             </button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
           </div>
@@ -359,17 +433,13 @@ export default function CarburantPage() {
           </div>
         )}
 
-        {/* Barre de recherche centrée */}
+        {/* Barre de recherche */}
         <div className="flex justify-center mb-6">
           <div className="relative w-full max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Rechercher par matricule, chauffeur, pôle…"
-              className="input-base pl-9 w-full"
-            />
+              className="input-base pl-9 w-full" />
           </div>
         </div>
 
@@ -380,55 +450,54 @@ export default function CarburantPage() {
               <thead className="sticky top-0 z-10 bg-camublue-900 text-white text-[11px] uppercase tracking-wide">
                 <tr>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Matricule</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Type</th>
-                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Quantité (L)</th>
-                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Montant (FCFA)</th>
+                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Montant Total (FCFA)</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Mt HT</th>
-                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Prix Unitaire</th>
-                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Distance (km)</th>
+                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Distance Totale (km)</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Distance GPS</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Pôle / CarGroup</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Dernier plein</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Chauffeur</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Code Projet</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">N° Carte</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
+                {allMatricules.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="py-16 text-center text-gray-400">
-                      {total === 0 ? "Aucune donnée. Importez d'abord un fichier Excel." : "Aucun résultat pour ces filtres."}
+                    <td colSpan={5} className="py-16 text-center text-gray-400">
+                      Aucun véhicule. Importez d'abord un fichier Excel.
                     </td>
                   </tr>
-                ) : rows.map((r, i) => (
-                  <tr key={r.id} className={`border-t border-slate-50 hover:bg-camugray-100/60 transition ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}>
-                    <td className="px-3 py-2.5 whitespace-nowrap cursor-pointer" onClick={() => setDetailRow(r)}>
-                      <span className="font-semibold text-camublue-900 hover:underline">{r.matricule}</span>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap cursor-pointer" onClick={() => openQuickEdit(r, "type_carburant")}>
-                      <TypeBadge type={r.type_carburant} />
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "quantite_totale")}>{fmt(r.quantite_totale, 2)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "montant_total")}>{fmt(r.montant_total)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-gray-500 cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "mt_ht")}>{fmt(r.mt_ht, 2)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-gray-500 cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "prix_unitaire")}>{fmt(r.prix_unitaire)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "distance_totale")}>{fmt(r.distance_totale)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-gray-500 cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "distance_gps")}>{fmt(r.distance_gps)}</td>
-                    <td className="px-3 py-2.5 text-gray-600 max-w-[200px] truncate cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "car_group")}>{r.car_group ?? "—"}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600 cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "dernier_plein")}>{fmtDate(r.dernier_plein)}</td>
-                    <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "driver_name")}>{r.driver_name || r.nom_chauffeur || "—"}</td>
-                    <td className="px-3 py-2.5 text-gray-500 text-xs cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "code_projet")}>{r.code_projet ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-gray-500 text-xs cursor-pointer hover:text-camublue-900" onClick={() => openQuickEdit(r, "num_carte")}>{r.num_carte ?? "—"}</td>
-                  </tr>
-                ))}
+                ) : displayRows.map((r, i) => {
+                  const hasData = monthData.has(r.matricule);
+                  return (
+                    <tr key={r.matricule} className={`border-t border-slate-50 hover:bg-camugray-100/60 transition ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}>
+                      <td className="px-3 py-2.5 whitespace-nowrap cursor-pointer" onClick={() => hasData ? setDetailRow(r) : undefined}>
+                        <span className={`font-semibold ${hasData ? "text-camublue-900 hover:underline cursor-pointer" : "text-gray-500"}`}>
+                          {r.matricule}
+                        </span>
+                      </td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
+                        onClick={() => hasData ? openQuickEdit(r, "montant_total") : undefined}>
+                        {fmt(r.montant_total)}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "text-gray-500 cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
+                        onClick={() => hasData ? openQuickEdit(r, "mt_ht") : undefined}>
+                        {fmt(r.mt_ht, 2)}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
+                        onClick={() => hasData ? openQuickEdit(r, "distance_totale") : undefined}>
+                        {fmt(r.distance_totale)}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "text-gray-500 cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
+                        onClick={() => hasData ? openQuickEdit(r, "distance_gps") : undefined}>
+                        {fmt(r.distance_gps)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-gray-500">
-              <span>Page {page} / {totalPages} — {total} véhicules</span>
+              <span>Page {page} / {totalPages} — {filteredMatricules.length} véhicules</span>
               <div className="flex gap-2 items-center">
                 <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-600 bg-white">
@@ -444,6 +513,9 @@ export default function CarburantPage() {
         </div>
       </div>
 
+      {/* Fermer dropdown mois en cliquant ailleurs */}
+      {moisOpen && <div className="fixed inset-0 z-20" onClick={() => setMoisOpen(false)} />}
+
       {/* ══ Modal Détail ligne ════════════════════════════════════════════════ */}
       {detailRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDetailRow(null)}>
@@ -453,7 +525,7 @@ export default function CarburantPage() {
                 <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><Fuel size={18} className="text-white" /></div>
                 <div>
                   <p className="text-white font-bold text-sm">{detailRow.matricule}</p>
-                  <p className="text-white/60 text-xs">{detailRow.car_group ?? "—"}</p>
+                  <p className="text-white/60 text-xs">{detailRow.car_group ?? "—"} · {MOIS_NOMS[(detailRow.mois ?? 1) - 1]}</p>
                 </div>
               </div>
               <button onClick={() => setDetailRow(null)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
@@ -496,7 +568,7 @@ export default function CarburantPage() {
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-xs text-gray-500">{quickEdit.row.matricule}</p>
+              <p className="text-xs text-gray-500">{quickEdit.row.matricule} · {MOIS_NOMS[(quickEdit.row.mois ?? 1) - 1]}</p>
               {FIELD_META[quickEdit.field].type === "select" ? (
                 <select className="input-base w-full" value={quickEdit.value}
                   onChange={e => setQuickEdit(q => q ? { ...q, value: e.target.value } : q)} autoFocus>
@@ -567,12 +639,13 @@ export default function CarburantPage() {
       {showCharts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowCharts(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            {/* Header modal avec ChartFilterBar */}
             <div className="bg-camublue-900 px-5 py-3 flex items-center gap-3 flex-wrap sticky top-0 z-10">
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
                 <BarChart2 size={16} className="text-white" />
               </div>
-              <p className="text-white font-bold text-sm shrink-0">Graphiques — Suivi Carburant</p>
+              <p className="text-white font-bold text-sm shrink-0">
+                Graphiques — {MOIS_NOMS[selectedMois - 1]}
+              </p>
               <div className="flex-1 flex justify-center">
                 <ChartFilterBar filter={chartFilter} onChange={setChartFilter} />
               </div>
@@ -602,7 +675,6 @@ export default function CarburantPage() {
                       </ResponsiveContainer>
                     </div>
                   </div>
-
                   <div className="bg-gray-50 rounded-xl p-4">
                     <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Top 10 coûts carburant (FCFA)</p>
                     <div style={{ height: hBarHeight(coutData) }}>
@@ -617,7 +689,6 @@ export default function CarburantPage() {
                       </ResponsiveContainer>
                     </div>
                   </div>
-
                   <div className="bg-gray-50 rounded-xl p-4">
                     <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Répartition par type — Litres</p>
                     <div style={{ height: 220 }}>
@@ -632,7 +703,6 @@ export default function CarburantPage() {
                       </ResponsiveContainer>
                     </div>
                   </div>
-
                   <div className="bg-gray-50 rounded-xl p-4">
                     <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Répartition par type — Montant (FCFA)</p>
                     <div style={{ height: 220 }}>
