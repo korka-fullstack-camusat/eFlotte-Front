@@ -86,11 +86,32 @@ export function DonutChart({ data, colors = DONUT_COLORS }: { data: { label: str
 
 const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
 
-export function MiniBarChart({ points, color = "#1e3a5f" }: { points: { mois: number; total: number }[]; color?: string }) {
+export function MiniBarChart({ points, color = "#1e3a5f" }: { points: { mois: number; annee?: number; total: number }[]; color?: string }) {
   const width = 600;
   const height = 180;
   const padding = 30;
   const max = Math.max(1, ...points.map(p => p.total));
+
+  // Mois unique : affichage centré avec label valeur
+  if (points.length === 1) {
+    const v = points[0].total;
+    const barWidth = 80;
+    const cx = width / 2;
+    const barHeight = (v / max) * (height - padding * 2);
+    const y = height - padding - barHeight;
+    const label = MOIS_LABELS[(points[0].mois - 1)] + (points[0].annee ? ` ${points[0].annee}` : "");
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-44">
+        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e5e7eb" />
+        <rect x={cx - barWidth / 2} y={y} width={barWidth} height={Math.max(barHeight, 2)} rx={5} fill={color} />
+        <text x={cx} y={y - 8} fontSize={13} textAnchor="middle" fill="#374151" fontWeight="600">
+          {v.toLocaleString("fr-FR")}
+        </text>
+        <text x={cx} y={height - padding + 16} fontSize={11} textAnchor="middle" fill="#9ca3af">{label}</text>
+      </svg>
+    );
+  }
+
   const data = Array.from({ length: 12 }, (_, i) => {
     const found = points.find(p => p.mois === i + 1);
     return found ? found.total : 0;
@@ -131,7 +152,7 @@ function fmtY(v: number): string {
   return String(Math.round(v));
 }
 
-export function MiniLineChart({ points }: { points: { mois: number; total: number }[] }) {
+export function MiniLineChart({ points }: { points: { mois: number; annee?: number; total: number }[] }) {
   const width = 620;
   const height = 200;
   const paddingLeft = 72;
@@ -140,6 +161,28 @@ export function MiniLineChart({ points }: { points: { mois: number; total: numbe
   const paddingBottom = 28;
 
   const max = Math.max(1, ...points.map(p => p.total));
+
+  // Mois unique : barre centrée avec valeur
+  if (points.length === 1) {
+    const v = points[0].total;
+    const cx = (width - paddingLeft - paddingRight) / 2 + paddingLeft;
+    const barWidth = 80;
+    const chartH = height - paddingTop - paddingBottom;
+    const barHeight = (v / max) * chartH;
+    const y = paddingTop + chartH - barHeight;
+    const label = MOIS_LABELS[(points[0].mois - 1)] + (points[0].annee ? ` ${points[0].annee}` : "");
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-48">
+        <line x1={paddingLeft} y1={paddingTop + chartH} x2={width - paddingRight} y2={paddingTop + chartH} stroke="#e5e7eb" />
+        <rect x={cx - barWidth / 2} y={y} width={barWidth} height={Math.max(barHeight, 2)} rx={5} fill="#1e3a5f" />
+        <text x={cx} y={y - 8} fontSize={13} textAnchor="middle" fill="#374151" fontWeight="600">
+          {fmtY(v)}
+        </text>
+        <text x={cx} y={height - paddingBottom + 16} fontSize={11} textAnchor="middle" fill="#9ca3af">{label}</text>
+      </svg>
+    );
+  }
+
   const data = Array.from({ length: 12 }, (_, i) => {
     const found = points.find(p => p.mois === i + 1);
     return found ? found.total : 0;

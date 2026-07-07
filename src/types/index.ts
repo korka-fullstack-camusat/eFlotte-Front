@@ -62,6 +62,7 @@ export interface FiltresCouts {
   types_vehicule: string[];
   fournisseurs: string[];
   types_location: string[];
+  types_cout: string[];
 }
 
 export interface PivotPoint {

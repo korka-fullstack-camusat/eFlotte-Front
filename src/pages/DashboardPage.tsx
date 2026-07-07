@@ -85,8 +85,7 @@ export default function DashboardPage() {
   const [evolutionCarburant, setEvolutionCarburant] = useState<EvolutionPoint[]>([]);
   const [evolutionMaint,     setEvolutionMaint]     = useState<EvolutionPoint[]>([]);
   const [evolutionRep,       setEvolutionRep]       = useState<EvolutionPoint[]>([]);
-  const [topEssence,         setTopEssence]         = useState<VehiculeCoutPoint[]>([]);
-  const [topGasoil,          setTopGasoil]          = useState<VehiculeCoutPoint[]>([]);
+  const [topCarburant,       setTopCarburant]       = useState<VehiculeCoutPoint[]>([]);
   const [topKm,              setTopKm]              = useState<VehiculeCoutPoint[]>([]);
   const [topReparation,      setTopReparation]      = useState<VehiculeCoutPoint[]>([]);
   const [filtres,            setFiltres]            = useState<FiltresCouts | null>(null);
@@ -118,8 +117,7 @@ export default function DashboardPage() {
       coutService.evolution({ ...p, type_cout: "CARBURANT" }).then(setEvolutionCarburant).catch(() => {}),
       coutService.evolution({ ...p, type_cout: "ENT" }).then(setEvolutionMaint).catch(() => {}),
       coutService.evolution({ ...p, type_cout: "REP" }).then(setEvolutionRep).catch(() => {}),
-      coutService.topCarburant({ type_carburant: "ESSENCE", annee: p.annee, mois: p.mois as any, limit: 10 }).then(setTopEssence).catch(() => {}),
-      coutService.topCarburant({ type_carburant: "GASOIL",  annee: p.annee, mois: p.mois as any, limit: 10 }).then(setTopGasoil).catch(() => {}),
+      coutService.topCarburant({ annee: p.annee, mois: p.mois as any, plaque: p.plaque, type_vehicule: p.type_vehicule, fournisseur: p.fournisseur, type_location: p.type_location, limit: 10 }).then(setTopCarburant).catch(() => {}),
       coutService.parVehicule({ ...p, type_cout: "DISTANCE", limit: 10 }).then(setTopKm).catch(() => {}),
       coutService.parVehicule({ ...p, type_cout: "REP",      limit: 10 }).then(setTopReparation).catch(() => {}),
       axios.get("/api/carburant/stats", { params: carParams }).then(r => setCarburantStats(r.data)).catch(() => {}),
@@ -284,25 +282,10 @@ export default function DashboardPage() {
 
       {/* ── Top 10 carburant ────────────────────────────────────────────── */}
       <SectionTitle>Top 10 Consommation Carburant — {periodeLabel}</SectionTitle>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3 h-3 rounded-full bg-orange-400 shrink-0" />
-            <h3 className="text-sm font-bold text-camublue-900">Essence (FCFA)</h3>
-          </div>
-          {topEssence.length === 0
-            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>
-            : <TopBarChart items={topEssence} color="#f97316" />}
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3 h-3 rounded-full bg-camublue-900 shrink-0" />
-            <h3 className="text-sm font-bold text-camublue-900">Gasoil (FCFA)</h3>
-          </div>
-          {topGasoil.length === 0
-            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>
-            : <TopBarChart items={topGasoil} color="#1e3a5f" />}
-        </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
+        {topCarburant.length === 0
+          ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée pour cette période.</p>
+          : <TopBarChart items={topCarburant} />}
       </div>
 
       {/* ── Top 10 km & réparation ──────────────────────────────────────── */}
