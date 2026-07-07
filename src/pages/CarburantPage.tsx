@@ -281,10 +281,16 @@ export default function CarburantPage() {
     fd.append("file", file);
     try {
       const { data } = await axios.post(`/api/carburant/import?mois=${selectedMois}`, fd);
-      toast.success(`Import ${MOIS_NOMS[selectedMois - 1]} : ${data.created} créés, ${data.updated} mis à jour`);
+      const moisImporte: number = data.mois_detecte ?? selectedMois;
+      const nomMois = MOIS_NOMS[moisImporte - 1];
+      toast.success(`Import ${nomMois} : ${data.created} créés, ${data.updated} mis à jour`);
       if (data.errors?.length) {
         toast.error(`${data.errors.length} erreur(s) — voir console`, { duration: 6000 });
         console.warn("Erreurs import carburant:", data.errors);
+      }
+      // Switcher automatiquement sur le mois détecté dans le fichier
+      if (moisImporte !== selectedMois) {
+        setSelectedMois(moisImporte);
       }
       setPage(1);
       await refreshAll();
