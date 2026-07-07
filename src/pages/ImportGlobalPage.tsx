@@ -287,6 +287,26 @@ export default function ImportGlobalPage() {
       .finally(() => setHistoryLoading(false));
   }, []);
 
+  /* ── Wakeup serveur avant import (cold start Render) ── */
+  const [wakeupMsg, setWakeupMsg] = useState("");
+
+  const ensureServerReady = async (): Promise<boolean> => {
+    const MAX = 12; // 12 × 5s = 60s max
+    for (let i = 0; i < MAX; i++) {
+      try {
+        await axios.get("/api/health", { timeout: 8000 });
+        setWakeupMsg("");
+        return true;
+      } catch {
+        const restant = (MAX - i - 1) * 5;
+        setWakeupMsg(`Le serveur démarre… veuillez patienter (${restant}s)`);
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+    setWakeupMsg("");
+    return false;
+  };
+
   /* ── Import handlers ── */
   const handleFile = async (file: File) => {
     if (!file.name.match(/\.(xlsx|xls)$/i)) {
@@ -297,11 +317,20 @@ export default function ImportGlobalPage() {
     setStatus("loading");
     setResult(null);
     setSinistreResult(null);
+    setErrorMsg("");
     try {
+      // Réveil du serveur Render (cold start) avant d'envoyer le fichier
+      const ready = await ensureServerReady();
+      if (!ready) {
+        setStatus("error");
+        setErrorMsg("Le serveur n'a pas répondu après 60 secondes. Réessayez dans quelques instants.");
+        return;
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       if (mode === "sinistres") {
-        const { data } = await axios.post("/api/sinistres/import", formData, { headers: { "Content-Type": "multipart/form-data" } });
+        const { data } = await axios.post("/api/sinistres/import", formData, { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 });
         setSinistreResult(data);
         setStatus("done");
         const errors = data.errors?.length ?? 0;
@@ -309,7 +338,7 @@ export default function ImportGlobalPage() {
         else toast.success(`Import sinistres : ${data.created} créés, ${data.updated} mis à jour`);
         axios.get<HistoryEntry[]>("/api/import-global/history").then(r => setHistory(r.data)).catch(() => {});
       } else {
-        const { data } = await axios.post<ImportResult>("/api/import-global", formData, { headers: { "Content-Type": "multipart/form-data" } });
+        const { data } = await axios.post<ImportResult>("/api/import-global", formData, { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 });
         setResult(data);
         setStatus("done");
         const total = Object.values(data).reduce((s, r) => s + r.created + r.updated, 0);
@@ -491,8 +520,17 @@ export default function ImportGlobalPage() {
               <div className="flex flex-col items-center justify-center gap-6 py-20">
                 <Loader2 size={48} className="text-camublue-900 animate-spin" />
                 <div className="text-center">
-                  <p className="font-semibold text-gray-700 text-base">Import en cours…</p>
-                  <p className="text-sm text-gray-400 mt-1">{fileName}</p>
+                  <p className="font-semibold text-gray-700 text-base">
+                    {wakeupMsg ? "Démarrage du serveur…" : "Import en cours…"}
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {wakeupMsg || fileName}
+                  </p>
+                  {wakeupMsg && (
+                    <p className="text-xs text-amber-600 mt-2 bg-amber-50 rounded-lg px-3 py-1.5">
+                      ⏳ Le serveur Render se réveille après inactivité — l'import démarrera automatiquement
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-2 w-full max-w-sm">
                   {SECTIONS.map(s => (
