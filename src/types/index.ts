@@ -56,6 +56,7 @@ export interface KpiCouts {
 }
 
 export interface FiltresCouts {
+  annees: number[];
   mois: string[];
   plaques: string[];
   types_vehicule: string[];
