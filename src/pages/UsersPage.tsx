@@ -12,6 +12,7 @@ import type { UserAccount } from "@/types";
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrateur",
   EDITOR: "Éditeur",
+  HSE: "HSE",
   VIEWER: "Lecture seule",
 };
 
@@ -180,6 +181,7 @@ export default function UsersPage() {
                 <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="input-base">
                   <option value="ADMIN">Administrateur</option>
                   <option value="EDITOR">Éditeur</option>
+                  <option value="HSE">HSE</option>
                   <option value="VIEWER">Lecture seule</option>
                 </select>
               </div>

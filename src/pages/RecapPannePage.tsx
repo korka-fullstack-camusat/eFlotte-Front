@@ -70,6 +70,7 @@ interface VehiculeRecap {
   car_group: string | null;
   statut_actuel: string | null;
   statuts: Record<string, string | null>;
+  sorti: boolean;
 }
 
 interface RecapData {
@@ -365,6 +366,7 @@ export default function RecapPannePage() {
   const kpiEnService   = filtered.filter(v => normStatut(v.statut_actuel) === "EN_SERVICE").length;
   const kpiMaintenance = filtered.filter(v => normStatut(v.statut_actuel) === "EN_MAINTENANCE").length;
   const kpiImmobilises = filtered.filter(v => normStatut(v.statut_actuel).startsWith("IMMOBILIS")).length;
+  const kpiSortis      = filtered.filter(v => v.sorti).length;
 
   const hasFilters = !!(filterGroup || filterFuel);
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
@@ -407,6 +409,25 @@ export default function RecapPannePage() {
     }
   }
 
+  /* Toggle sorti */
+  async function handleToggleSorti(v: VehiculeRecap) {
+    if (isViewer) return;
+    const newVal = !v.sorti;
+    try {
+      const url = v.id != null
+        ? `/api/suivi-pannes/recap/${v.id}`
+        : `/api/suivi-pannes/recap/by-plaque/${encodeURIComponent(v.immatriculation)}`;
+      const resp = await axios.patch(url, { sorti: newVal });
+      const newId = resp.data?.id ?? v.id;
+      setRows(prev => prev.map(r =>
+        r.immatriculation !== v.immatriculation ? r : { ...r, id: newId, sorti: newVal }
+      ));
+      toast.success(newVal ? "Véhicule marqué Sorti" : "Véhicule remis en flotte");
+    } catch {
+      toast.error("Erreur lors de la modification");
+    }
+  }
+
   /* ── Rendu ─────────────────────────────────────────────────────── */
   return (
     <AppLayout>
@@ -442,11 +463,12 @@ export default function RecapPannePage() {
       </div>
 
       {/* ── KPI dynamiques ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         <KpiCard label="Total véhicules"  value={kpiTotal}       icon={<Car size={20}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
         <KpiCard label="En service"       value={kpiEnService}   icon={<CheckCircle size={20}/>} bg="bg-emerald-100"     text="text-emerald-600" />
         <KpiCard label="En maintenance"   value={kpiMaintenance} icon={<Wrench size={20}/>}      bg="bg-amber-100"       text="text-amber-600" />
         <KpiCard label="Immobilisés"      value={kpiImmobilises} icon={<Ban size={20}/>}         bg="bg-rose-100"        text="text-rose-600" />
+        <KpiCard label="Sortis flotte"    value={kpiSortis}      icon={<X size={20}/>}           bg="bg-gray-100"        text="text-gray-600" />
       </div>
 
       {/* ── Recherche centrée ── */}
@@ -476,6 +498,7 @@ export default function RecapPannePage() {
                   <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Label</th>
                   <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Fuel type</th>
                   <th className="text-left px-4 py-2.5 font-semibold whitespace-nowrap">Car Group</th>
+                  <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">Sorti</th>
                   {mois.map(m => (
                     <th key={m} className="text-center px-2 py-2.5 font-semibold whitespace-nowrap min-w-[72px]">
                       {moisLabel(m)}
@@ -509,6 +532,20 @@ export default function RecapPannePage() {
                       title={v.car_group ?? ""}
                       className={`px-4 py-2.5 text-gray-600 whitespace-nowrap max-w-[180px] truncate ${!isViewer ? "cursor-pointer hover:text-camublue-900" : ""}`}>
                       {v.car_group || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        onClick={() => handleToggleSorti(v)}
+                        disabled={isViewer}
+                        title={v.sorti ? "Cliquer pour remettre en flotte" : "Cliquer pour marquer comme sorti"}
+                        className={`inline-flex items-center justify-center w-8 h-5 rounded text-[10px] font-bold transition ${
+                          v.sorti
+                            ? "bg-gray-600 text-white hover:bg-gray-700"
+                            : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                        } ${isViewer ? "cursor-default opacity-60" : "cursor-pointer"}`}
+                      >
+                        {v.sorti ? "OUI" : "NON"}
+                      </button>
                     </td>
                     {mois.map(m => (
                       <td key={m}

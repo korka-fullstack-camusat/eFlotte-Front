@@ -20,6 +20,15 @@ interface CarburantStats {
   litres_gazoil: number; litres_essence: number;
   montant_gazoil: number; montant_essence: number;
 }
+interface DevisStats {
+  cout_total: number; cout_entretien: number; cout_reparation: number;
+  nb_total: number;
+  po_par_fournisseur: { fournisseur: string; nb_po: number }[];
+}
+interface SinistresStats {
+  total: number; nb_accident: number; nb_incident: number; nb_autre: number;
+  circonstances: { label: string; value: number }[];
+}
 
 function normStatut(s: string | null | undefined): string {
   return (s || "").trim().toUpperCase()
@@ -88,6 +97,8 @@ export default function DashboardPage() {
   const [topCarburant,       setTopCarburant]       = useState<VehiculeCoutPoint[]>([]);
   const [topKm,              setTopKm]              = useState<VehiculeCoutPoint[]>([]);
   const [topReparation,      setTopReparation]      = useState<VehiculeCoutPoint[]>([]);
+  const [devisStats,         setDevisStats]         = useState<DevisStats | null>(null);
+  const [sinistresStats,     setSinistresStats]     = useState<SinistresStats | null>(null);
   const [filtres,            setFiltres]            = useState<FiltresCouts | null>(null);
   const [filters,            setFilters]            = useState<CoutsFilters>({ annee: THIS_YEAR });
   const [filterModal,        setFilterModal]        = useState(false);
@@ -99,6 +110,8 @@ export default function DashboardPage() {
     vehiculeService.getAll().then(setVehicules).catch(() => {});
     axios.get("/api/vehicules/stats").then(r => setVehiculeStats(r.data)).catch(() => {});
     coutService.filtres().then(setFiltres).catch(() => {});
+    axios.get("/api/suivi-devis/stats").then(r => setDevisStats(r.data)).catch(() => {});
+    axios.get("/api/sinistres/stats").then(r => setSinistresStats(r.data)).catch(() => {});
   }, []);
 
   // Données filtrées — toutes les courbes et KPIs
@@ -231,6 +244,54 @@ export default function DashboardPage() {
         <KpiCard label="Coût entretien (FCFA)"  value={coutMaintenanceTotal}      icon={<Wrench size={20}/>}  bg="bg-amber-100"       text="text-amber-600" valueColor="text-amber-600" />
         <KpiCard label="Coût réparation (FCFA)" value={coutReparationTotal}       icon={<Wrench size={20}/>}  bg="bg-rose-100"        text="text-rose-600"  valueColor="text-rose-600" />
       </div>
+
+      {/* ── Suivi Devis KPIs ───────────────────────────────────────────── */}
+      {devisStats && (
+        <div className="mb-5">
+          <SectionTitle>Suivi des devis — Global</SectionTitle>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <KpiCard label="Coût total devis (FCFA)"     value={devisStats.cout_total}      icon={<Wallet size={20}/>}  bg="bg-camublue-900/10" text="text-camublue-900" />
+            <KpiCard label="Coût total entretien (FCFA)" value={devisStats.cout_entretien}  icon={<Wrench size={20}/>}  bg="bg-amber-100"       text="text-amber-600" />
+            <KpiCard label="Coût total réparation (FCFA)"value={devisStats.cout_reparation} icon={<Wrench size={20}/>}  bg="bg-rose-100"        text="text-rose-600" />
+            <KpiCard label="Nombre de devis"             value={devisStats.nb_total}        icon={<BarChart2 size={20}/>} bg="bg-emerald-100"   text="text-emerald-600" />
+          </div>
+          {devisStats.po_par_fournisseur.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-camublue-900 mb-4">Répartition nombre de PO par fournisseur</h3>
+              <ResponsiveContainer width="100%" height={Math.max(200, devisStats.po_par_fournisseur.length * 36)}>
+                <BarChart data={devisStats.po_par_fournisseur} layout="vertical" margin={{ left: 4, right: 50, top: 4, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="fournisseur" tick={{ fontSize: 10 }} width={110} />
+                  <RTooltip formatter={(v: number) => [`${v} PO`, ""]} />
+                  <Bar dataKey="nb_po" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 10, fill: "#6b7280" }}>
+                    {devisStats.po_par_fournisseur.map((_, i) => <Cell key={i} fill={RANK_COLORS[i % RANK_COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Sinistres circonstances ────────────────────────────────────── */}
+      {sinistresStats && (
+        <div className="mb-5">
+          <SectionTitle>Suivi des sinistres — Circonstances</SectionTitle>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <KpiCard label="Total sinistres"  value={sinistresStats.total}       icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" />
+            <KpiCard label="Accidents"        value={sinistresStats.nb_accident} icon={<Car size={20}/>}       bg="bg-rose-100"        text="text-rose-600" />
+            <KpiCard label="Incidents"        value={sinistresStats.nb_incident} icon={<Car size={20}/>}       bg="bg-amber-100"       text="text-amber-600" />
+            <KpiCard label="Autres"           value={sinistresStats.nb_autre}    icon={<BarChart2 size={20}/>} bg="bg-gray-100"        text="text-gray-600" />
+          </div>
+          {sinistresStats.circonstances.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-camublue-900 mb-4">Répartition ACCIDENT / INCIDENT</h3>
+              <DonutChart data={sinistresStats.circonstances} colors={["#f43f5e","#f59e0b","#9ca3af","#6366f1","#10b981"]} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── KPI Carburant (filtré) ──────────────────────────────────────── */}
       {carburantStats && (

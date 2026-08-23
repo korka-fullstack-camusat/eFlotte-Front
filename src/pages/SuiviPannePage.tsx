@@ -30,26 +30,45 @@ function fmt(d: string | null | undefined) {
   try { return new Date(d).toLocaleDateString("fr-FR"); } catch { return d; }
 }
 
-function StatutBadge({ panne }: { panne: SuiviPanne }) {
-  if (panne.date_fin_reparation) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-        <CheckCircle2 size={11} /> Réparé
-      </span>
-    );
-  }
-  const nature = (panne.nature_panne ?? "").toUpperCase();
-  if (nature.includes("CONFIRM") || nature === "0A CONFIRMER") {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-        <Clock size={11} /> À confirmer
-      </span>
-    );
-  }
+const STATUT_OPTIONS = [
+  { value: "EN_COURS",    label: "En cours",    cls: "bg-red-100 text-red-700",     icon: <AlertTriangle size={11} /> },
+  { value: "REPARE",      label: "Réparé",      cls: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 size={11} /> },
+  { value: "A_CONFIRMER", label: "À confirmer", cls: "bg-amber-100 text-amber-700", icon: <Clock size={11} /> },
+];
+
+function getStatut(p: SuiviPanne): string {
+  if (p.statut) return p.statut;
+  if (p.date_fin_reparation) return "REPARE";
+  const nature = (p.nature_panne ?? "").toUpperCase();
+  if (nature.includes("CONFIRM")) return "A_CONFIRMER";
+  return "EN_COURS";
+}
+
+function StatutBadge({ panne, onUpdate }: { panne: SuiviPanne; onUpdate: (s: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const st = getStatut(panne);
+  const opt = STATUT_OPTIONS.find(o => o.value === st) ?? STATUT_OPTIONS[0];
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-      <AlertTriangle size={11} /> En cours
-    </span>
+    <div className="relative">
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${opt.cls} hover:opacity-80 transition`}
+        title="Cliquer pour modifier le statut"
+      >
+        {opt.icon} {opt.label}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-6 z-30 bg-white border border-gray-100 rounded-xl shadow-xl py-1 min-w-[140px]" onClick={e => e.stopPropagation()}>
+          {STATUT_OPTIONS.map(o => (
+            <button key={o.value}
+              onClick={() => { onUpdate(o.value); setOpen(false); }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold hover:bg-gray-50 transition text-left ${o.value === st ? "opacity-50 cursor-default" : ""}`}>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${o.cls}`}>{o.icon} {o.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -159,6 +178,16 @@ export default function SuiviPannePage() {
     try {
       await suiviPanneService.remove(p.id);
       toast.success("Supprimé");
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur");
+    }
+  };
+
+  const handleStatutUpdate = async (p: SuiviPanne, statut: string) => {
+    try {
+      await suiviPanneService.update(p.id, { statut } as any);
+      toast.success("Statut mis à jour");
       load();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Erreur");
@@ -345,7 +374,11 @@ export default function SuiviPannePage() {
                       onClick={e => openQuickEdit(e, p, "immobilisation_jrs", "Immobilisation (jrs)", "number")}>
                       <span className={qSpan}>{p.immobilisation_jrs != null ? p.immobilisation_jrs : "—"}</span>
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap"><StatutBadge panne={p} /></td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {isViewer
+                        ? <StatutBadge panne={p} onUpdate={() => {}} />
+                        : <StatutBadge panne={p} onUpdate={s => handleStatutUpdate(p, s)} />}
+                    </td>
                   </tr>
                   );
                 })}
@@ -390,8 +423,9 @@ export default function SuiviPannePage() {
                   onChange={e => setDraftFilters(d => ({ ...d, statut: e.target.value || undefined }))}
                   className="input-base w-full">
                   <option value="">Tous</option>
-                  <option value="repare">Réparé</option>
-                  <option value="en_cours">En cours</option>
+                  <option value="REPARE">Réparé</option>
+                  <option value="EN_COURS">En cours</option>
+                  <option value="A_CONFIRMER">À confirmer</option>
                 </select>
               </div>
               <div className="flex gap-2 mt-2">

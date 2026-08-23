@@ -145,7 +145,10 @@ export interface MissionChauffeur {
   demandeur: string | null;
   telephone: string | null;
   projet: string | null;
-  destination: string | null;
+  motif: string | null;
+  destination: string | null;  // rétrocompat
+  heure_debut: string | null;  // "HH:MM:SS"
+  heure_fin: string | null;
   date_depart: string | null;
   date_retour: string | null;
   commentaires: string | null;
@@ -254,6 +257,7 @@ export interface SuiviPanne {
   site: string | null;
   immobilisation_jrs: number | null;
   commentaire: string | null;
+  statut: string | null;  // EN_COURS | REPARE | A_CONFIRMER
 }
 
 export interface SuiviPannePage {

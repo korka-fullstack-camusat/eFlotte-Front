@@ -14,7 +14,8 @@ import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } fro
 
 const EMPTY = {
   date: "", immatriculation: "", chauffeur: "", demandeur: "", telephone: "",
-  projet: "", destination: "", date_depart: "", date_retour: "", commentaires: "",
+  projet: "", motif: "", heure_debut: "", heure_fin: "",
+  date_depart: "", date_retour: "", commentaires: "",
 };
 
 function formatDate(iso: string | null | undefined): string {
@@ -35,7 +36,7 @@ function topN(items: MissionChauffeur[], key: keyof MissionChauffeur, n = 10) {
     .map(([label, value]) => ({ label, value }));
 }
 
-type QuickEditField = "date" | "immatriculation" | "chauffeur" | "demandeur" | "telephone" | "projet" | "destination" | "date_depart" | "date_retour" | "commentaires";
+type QuickEditField = "date" | "immatriculation" | "chauffeur" | "demandeur" | "telephone" | "projet" | "motif" | "heure_debut" | "heure_fin" | "date_depart" | "date_retour" | "commentaires";
 
 export default function ChauffeurPolesPage() {
   const { isViewer } = useAuth();
@@ -153,7 +154,9 @@ export default function ChauffeurPolesPage() {
       demandeur: m.demandeur ?? "",
       telephone: m.telephone ?? "",
       projet: m.projet ?? "",
-      destination: m.destination ?? "",
+      motif: m.motif ?? m.destination ?? "",
+      heure_debut: m.heure_debut?.slice(0, 5) ?? "",
+      heure_fin: m.heure_fin?.slice(0, 5) ?? "",
       date_depart: m.date_depart?.slice(0, 10) ?? "",
       date_retour: m.date_retour?.slice(0, 10) ?? "",
       commentaires: m.commentaires ?? "",
@@ -171,7 +174,9 @@ export default function ChauffeurPolesPage() {
         demandeur: form.demandeur || null,
         telephone: form.telephone || null,
         projet: form.projet || null,
-        destination: form.destination || null,
+        motif: form.motif || null,
+        heure_debut: form.heure_debut || null,
+        heure_fin: form.heure_fin || null,
         date_depart: form.date_depart || null,
         date_retour: form.date_retour || null,
         commentaires: form.commentaires || null,
@@ -209,7 +214,9 @@ export default function ChauffeurPolesPage() {
     { key: "demandeur",      header: "Demandeur",        value: r => r.demandeur ?? "" },
     { key: "telephone",      header: "Téléphone",        value: r => r.telephone ?? "" },
     { key: "projet",         header: "Projet",           value: r => r.projet ?? "" },
-    { key: "destination",    header: "Destination",      value: r => r.destination ?? "" },
+    { key: "motif",          header: "Motif",            value: r => r.motif ?? r.destination ?? "" },
+    { key: "heure_debut",    header: "Heure début",      value: r => r.heure_debut?.slice(0, 5) ?? "" },
+    { key: "heure_fin",      header: "Heure fin",        value: r => r.heure_fin?.slice(0, 5) ?? "" },
     { key: "date_depart",    header: "Date départ",      value: r => r.date_depart?.slice(0, 10) ?? "" },
     { key: "date_retour",    header: "Date retour",      value: r => r.date_retour?.slice(0, 10) ?? "" },
     { key: "commentaires",   header: "Commentaires",     value: r => r.commentaires ?? "" },
@@ -218,7 +225,7 @@ export default function ChauffeurPolesPage() {
   const filteredItems = items.filter(m => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
-    return [m.immatriculation, m.chauffeur, m.demandeur, m.projet, m.destination]
+    return [m.immatriculation, m.chauffeur, m.demandeur, m.projet, m.motif, m.destination]
       .some(v => (v ?? "").toLowerCase().includes(q));
   });
 
@@ -295,16 +302,18 @@ export default function ChauffeurPolesPage() {
             <table className="w-full text-sm table-fixed">
               <thead className="bg-camublue-900 text-white text-xs uppercase sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[8%]">Date</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Imma</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[10%]">Chauffeur</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[10%]">Demandeur</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Téléphone</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[10%]">Projet</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[12%]">Destination</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Date départ</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Date retour</th>
-                  <th className="text-left px-4 py-2.5 font-semibold w-[14%]">Commentaires</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[7%]">Date</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[8%]">Imma</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Chauffeur</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Demandeur</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[8%]">Téléphone</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Projet</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[11%]">Motif</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[7%]">H. Début</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[7%]">H. Fin</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[8%]">Dt départ</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[8%]">Dt retour</th>
+                  <th className="text-left px-4 py-2.5 font-semibold w-[9%]">Commentaires</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -335,8 +344,16 @@ export default function ChauffeurPolesPage() {
                       <span className={editableSpan}>{m.projet || "—"}</span>
                     </td>
                     <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
-                      onClick={e => openQuickEdit(e, m, "destination", "Destination")}>
-                      <span className={editableSpan}>{m.destination || "—"}</span>
+                      onClick={e => openQuickEdit(e, m, "motif", "Motif")}>
+                      <span className={editableSpan}>{m.motif ?? m.destination ?? "—"}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "heure_debut", "Heure de début")}>
+                      <span className={editableSpan}>{m.heure_debut?.slice(0, 5) || "—"}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
+                      onClick={e => openQuickEdit(e, m, "heure_fin", "Heure de fin")}>
+                      <span className={editableSpan}>{m.heure_fin?.slice(0, 5) || "—"}</span>
                     </td>
                     <td className={`px-4 py-2.5 text-gray-600 truncate ${editableTd}`}
                       onClick={e => openQuickEdit(e, m, "date_depart", "Date départ", "date")}>
@@ -375,7 +392,7 @@ export default function ChauffeurPolesPage() {
                 <p><span className="font-semibold text-gray-700">Plaque :</span> {manageRow.immatriculation}</p>
                 <p><span className="font-semibold text-gray-700">Date :</span> {formatDate(manageRow.date)}</p>
                 <p><span className="font-semibold text-gray-700">Chauffeur :</span> {manageRow.chauffeur || "—"}</p>
-                <p><span className="font-semibold text-gray-700">Destination :</span> {manageRow.destination || "—"}</p>
+                <p><span className="font-semibold text-gray-700">Motif :</span> {manageRow.motif ?? manageRow.destination ?? "—"}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -444,7 +461,7 @@ export default function ChauffeurPolesPage() {
         const chauffeurData = topN(allItems, "chauffeur");
         const projetData = topN(allItems, "projet");
         const immaData = topN(allItems, "immatriculation");
-        const destData = topN(allItems, "destination");
+        const destData = topN(allItems, "motif");
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowCharts(false)}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
@@ -514,7 +531,7 @@ export default function ChauffeurPolesPage() {
                     </div>
 
                     <div className="bg-gray-50 rounded-xl p-4">
-                      <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Missions par destination (top 10)</p>
+                      <p className="text-xs font-semibold text-gray-600 mb-3 text-center">Missions par motif (top 10)</p>
                       <div style={{ height: hBarHeight(destData) }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={destData} layout="vertical" margin={{ left: 8, right: 30, top: 4, bottom: 4 }}>
@@ -623,8 +640,16 @@ export default function ChauffeurPolesPage() {
                 <input type="text" value={form.projet} onChange={e => setForm(f => ({ ...f, projet: e.target.value }))} className="input-base" />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Destination</label>
-                <input type="text" value={form.destination} onChange={e => setForm(f => ({ ...f, destination: e.target.value }))} className="input-base" />
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Motif</label>
+                <input type="text" value={form.motif} onChange={e => setForm(f => ({ ...f, motif: e.target.value }))} className="input-base" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Heure de début</label>
+                <input type="time" value={form.heure_debut} onChange={e => setForm(f => ({ ...f, heure_debut: e.target.value }))} className="input-base" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Heure de fin</label>
+                <input type="time" value={form.heure_fin} onChange={e => setForm(f => ({ ...f, heure_fin: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Date départ</label>
