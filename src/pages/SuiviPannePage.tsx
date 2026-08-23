@@ -506,7 +506,7 @@ export default function SuiviPannePage() {
                 <p><span className="font-semibold text-gray-700">Projet :</span> {manageRow.projet || "—"}</p>
                 <p><span className="font-semibold text-gray-700">Nature :</span> {manageRow.nature_panne || "—"}</p>
                 <p><span className="font-semibold text-gray-700">Immobilisation :</span> {manageRow.immobilisation_jrs != null ? `${manageRow.immobilisation_jrs} jrs` : "—"}</p>
-                <p><span className="font-semibold text-gray-700">Statut :</span> <StatutBadge panne={manageRow} /></p>
+                <p><span className="font-semibold text-gray-700">Statut :</span> <StatutBadge panne={manageRow} onUpdate={() => {}} /></p>
               </div>
               <div className="flex gap-2">
                 <button
