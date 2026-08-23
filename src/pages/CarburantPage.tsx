@@ -319,8 +319,21 @@ export default function CarburantPage() {
     let parsed: unknown = value || null;
     if (meta.type === "number" && value) parsed = parseFloat(value);
     try {
-      const { data } = await axios.patch(`/api/carburant/${row.id}`, { [field]: parsed });
-      toast.success("Mis à jour");
+      let data: CarburantRow;
+      if (row.id === -1) {
+        // Création : POST avec matricule + mois + le champ saisi
+        const res = await axios.post("/api/carburant", {
+          matricule: row.matricule,
+          mois: selectedMois,
+          [field]: parsed,
+        });
+        data = res.data;
+        toast.success("Entrée créée");
+      } else {
+        const res = await axios.patch(`/api/carburant/${row.id}`, { [field]: parsed });
+        data = res.data;
+        toast.success("Mis à jour");
+      }
       setMonthData(prev => {
         const next = new Map(prev);
         next.set(row.matricule, { ...row, ...data });
@@ -395,6 +408,20 @@ export default function CarburantPage() {
               )}
             </div>
 
+            {/* Filtre rapide ESSENCE / GAZOIL */}
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 text-xs font-semibold">
+              <button
+                onClick={() => setTypeCarb(typeCarb === "GAZOIL" ? "" : "GAZOIL")}
+                className={`px-3 py-2 transition ${typeCarb === "GAZOIL" ? "bg-blue-700 text-white" : "bg-white text-blue-700 hover:bg-blue-50"}`}>
+                Gazoil
+              </button>
+              <button
+                onClick={() => setTypeCarb(typeCarb === "ESSENCE" ? "" : "ESSENCE")}
+                className={`px-3 py-2 border-l border-gray-200 transition ${typeCarb === "ESSENCE" ? "bg-orange-500 text-white" : "bg-white text-orange-600 hover:bg-orange-50"}`}>
+                Essence
+              </button>
+            </div>
+
             <button onClick={openCharts}
               className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
               <BarChart2 size={15} /><span>Voir graphiques</span>
@@ -456,6 +483,7 @@ export default function CarburantPage() {
               <thead className="sticky top-0 z-10 bg-camublue-900 text-white text-[11px] uppercase tracking-wide">
                 <tr>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Matricule</th>
+                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Quantité (L)</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Montant Total (FCFA)</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Mt HT</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Distance Totale (km)</th>
@@ -465,7 +493,7 @@ export default function CarburantPage() {
               <tbody>
                 {allMatricules.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-16 text-center text-gray-400">
+                    <td colSpan={6} className="py-16 text-center text-gray-400">
                       Aucun véhicule. Importez d'abord un fichier Excel.
                     </td>
                   </tr>
@@ -473,26 +501,30 @@ export default function CarburantPage() {
                   const hasData = monthData.has(r.matricule);
                   return (
                     <tr key={r.matricule} className={`border-t border-slate-50 hover:bg-camugray-100/60 transition ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}>
-                      <td className="px-3 py-2.5 whitespace-nowrap cursor-pointer" onClick={() => hasData ? setDetailRow(r) : undefined}>
-                        <span className={`font-semibold ${hasData ? "text-camublue-900 hover:underline cursor-pointer" : "text-gray-500"}`}>
-                          {r.matricule}
+                      <td className="px-3 py-2.5 whitespace-nowrap cursor-pointer" onClick={() => hasData ? setDetailRow(r) : openQuickEdit(r, "montant_total")}>
+                        <span className={`font-semibold ${hasData ? "text-camublue-900 hover:underline" : "text-gray-400 hover:text-camublue-900 italic text-xs"}`}>
+                          {r.matricule}{!hasData && <span className="ml-1 text-[10px] text-gray-300">+ saisir</span>}
                         </span>
                       </td>
-                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
-                        onClick={() => hasData ? openQuickEdit(r, "montant_total") : undefined}>
-                        {fmt(r.montant_total)}
+                      <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900"
+                        onClick={() => openQuickEdit(r, "quantite_totale")}>
+                        <span className={hasData ? "" : "text-gray-300"}>{fmt(r.quantite_totale, 1)}</span>
                       </td>
-                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "text-gray-500 cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
-                        onClick={() => hasData ? openQuickEdit(r, "mt_ht") : undefined}>
-                        {fmt(r.mt_ht, 2)}
+                      <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900"
+                        onClick={() => openQuickEdit(r, "montant_total")}>
+                        <span className={hasData ? "" : "text-gray-300"}>{fmt(r.montant_total)}</span>
                       </td>
-                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
-                        onClick={() => hasData ? openQuickEdit(r, "distance_totale") : undefined}>
-                        {fmt(r.distance_totale)}
+                      <td className="px-3 py-2.5 text-right tabular-nums text-gray-500 cursor-pointer hover:text-camublue-900"
+                        onClick={() => openQuickEdit(r, "mt_ht")}>
+                        <span className={hasData ? "" : "text-gray-300"}>{fmt(r.mt_ht, 2)}</span>
                       </td>
-                      <td className={`px-3 py-2.5 text-right tabular-nums ${hasData ? "text-gray-500 cursor-pointer hover:text-camublue-900" : "text-gray-300"}`}
-                        onClick={() => hasData ? openQuickEdit(r, "distance_gps") : undefined}>
-                        {fmt(r.distance_gps)}
+                      <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900"
+                        onClick={() => openQuickEdit(r, "distance_totale")}>
+                        <span className={hasData ? "" : "text-gray-300"}>{fmt(r.distance_totale)}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-gray-500 cursor-pointer hover:text-camublue-900"
+                        onClick={() => openQuickEdit(r, "distance_gps")}>
+                        <span className={hasData ? "" : "text-gray-300"}>{fmt(r.distance_gps)}</span>
                       </td>
                     </tr>
                   );
