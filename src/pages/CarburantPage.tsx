@@ -208,23 +208,23 @@ export default function CarburantPage() {
   };
 
   const fetchStats = useCallback(async () => {
-    const params: Record<string, string | number> = { mois: selectedMois };
+    const params: Record<string, string | number> = {};
     if (carGroup) params.car_group = carGroup;
     if (typeCarb) params.type_carburant = typeCarb;
     const { data } = await axios.get("/api/carburant/stats", { params });
     setStats(data);
-  }, [selectedMois, carGroup, typeCarb]);
+  }, [carGroup, typeCarb]);
 
-  // Charge les données du mois sélectionné et les indexe par matricule
+  // Charge toutes les données (sans filtre mois/annee tant que la migration DB n'est pas appliquée)
   const fetchMonthData = useCallback(async () => {
-    const params: Record<string, string | number> = { mois: selectedMois, page: 1, page_size: 9999 };
+    const params: Record<string, string | number> = { page: 1, page_size: 9999 };
     if (carGroup) params.car_group = carGroup;
     if (typeCarb) params.type_carburant = typeCarb;
     const { data } = await axios.get("/api/carburant", { params });
     const map = new Map<string, CarburantRow>();
     (data.items as CarburantRow[]).forEach(r => map.set(r.matricule, r));
     setMonthData(map);
-  }, [selectedMois, carGroup, typeCarb]);
+  }, [carGroup, typeCarb]);
 
   const fetchFiltres = async () => {
     const { data } = await axios.get("/api/carburant/filtres");
@@ -244,7 +244,7 @@ export default function CarburantPage() {
     fetchMonthData();
     fetchStats();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMois, carGroup, typeCarb]);
+  }, [carGroup, typeCarb]);
 
   // Après un import : rafraîchir aussi la liste de référence
   const refreshAll = async () => {
@@ -271,7 +271,7 @@ export default function CarburantPage() {
   const openCharts = () => {
     setShowCharts(true);
     setLoadingCharts(true);
-    axios.get("/api/carburant", { params: { mois: selectedMois, page: 1, page_size: 9999 } })
+    axios.get("/api/carburant", { params: { page: 1, page_size: 9999 } })
       .then(({ data }) => setAllChartRows(data.items))
       .catch(() => {})
       .finally(() => setLoadingCharts(false));
