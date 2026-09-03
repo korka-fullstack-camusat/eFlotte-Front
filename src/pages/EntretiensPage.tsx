@@ -229,6 +229,18 @@ export default function EntretiensPage() {
         </div>
       </div>
 
+      {/* Légende */}
+      <div className="flex items-center gap-4 mb-3 px-1">
+        <span className="flex items-center gap-1.5 text-xs text-gray-600">
+          <span className="inline-block w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-400"></span>
+          Vidange effectuée
+        </span>
+        <span className="flex items-center gap-1.5 text-xs text-gray-600">
+          <span className="inline-block w-3 h-3 rounded-sm bg-amber-200 border border-amber-400"></span>
+          Vidange en cours
+        </span>
+      </div>
+
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
           <p className="text-sm text-gray-400 p-6 text-center">Chargement…</p>
@@ -251,8 +263,12 @@ export default function EntretiensPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {pagedEntretiens.map(e => {
+                  const s = (e.type_location ?? "").toUpperCase();
+                  const rowCls = s.includes("EFFECT") ? "bg-emerald-50 hover:bg-emerald-100/70"
+                    : s.includes("COURS")  ? "bg-amber-50 hover:bg-amber-100/70"
+                    : "hover:bg-gray-50/60";
                   return (
-                  <tr key={e.id} className="hover:bg-gray-50/60 cursor-pointer" onClick={() => setManageRow(e)}>
+                  <tr key={e.id} className={`${rowCls} cursor-pointer`} onClick={() => setManageRow(e)}>
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       {e.type_location ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{e.type_location}</span>
