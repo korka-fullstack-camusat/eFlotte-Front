@@ -214,25 +214,31 @@ export default function SuiviPannePage() {
     setQuickValue(cur);
   };
 
+  const calcImmo = (debut: string | null | undefined, fin: string | null | undefined): number | null => {
+    if (!debut || !fin) return null;
+    const diff = Math.round((new Date(fin).getTime() - new Date(debut).getTime()) / 86400000);
+    return diff >= 0 && diff <= 365 ? diff : null;
+  };
+
   const handleQuickSave = async () => {
     if (!quickEdit) return;
     setQuickSaving(true);
     const { item, field, type } = quickEdit;
     const val = quickValue === "" ? null : (type === "number" ? Number(quickValue) : quickValue);
     const patch: Record<string, unknown> = { [field]: val };
-    if (field === "date_fin_reparation" && quickValue && item.date_indisponibilite) {
-      const diff = Math.round((new Date(quickValue).getTime() - new Date(item.date_indisponibilite).getTime()) / 86400000);
-      if (diff >= 0) patch.immobilisation_jrs = diff;
+    if (field === "date_fin_reparation") {
+      const immo = calcImmo(item.date_indisponibilite, quickValue || null);
+      if (immo !== null) patch.immobilisation_jrs = immo;
     }
-    if (field === "date_indisponibilite" && quickValue && item.date_fin_reparation) {
-      const diff = Math.round((new Date(item.date_fin_reparation).getTime() - new Date(quickValue).getTime()) / 86400000);
-      if (diff >= 0) patch.immobilisation_jrs = diff;
+    if (field === "date_indisponibilite") {
+      const immo = calcImmo(quickValue || null, item.date_fin_reparation);
+      if (immo !== null) patch.immobilisation_jrs = immo;
     }
     try {
       await suiviPanneService.update(item.id, patch as any);
       toast.success("Mis à jour");
       setQuickEdit(null);
-      load();
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...patch } as SuiviPanne : i));
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Erreur");
     } finally {
@@ -473,16 +479,14 @@ export default function SuiviPannePage() {
                 <Field label="Site" value={form.site ?? ""} onChange={v => setForm(p => ({ ...p, site: v }))} />
                 <Field label="Date d'indisponibilité" type="date" value={form.date_indisponibilite ?? ""} onChange={v => {
                   setForm(p => {
-                    const fin = p.date_fin_reparation;
-                    const jrs = fin && v ? Math.round((new Date(fin).getTime() - new Date(v).getTime()) / 86400000) : p.immobilisation_jrs;
-                    return { ...p, date_indisponibilite: v, immobilisation_jrs: jrs != null && jrs >= 0 ? jrs : p.immobilisation_jrs };
+                    const immo = calcImmo(v, p.date_fin_reparation);
+                    return { ...p, date_indisponibilite: v, ...(immo !== null ? { immobilisation_jrs: immo } : {}) };
                   });
                 }} />
                 <Field label="Date de fin de réparation" type="date" value={form.date_fin_reparation ?? ""} onChange={v => {
                   setForm(p => {
-                    const debut = p.date_indisponibilite;
-                    const jrs = debut && v ? Math.round((new Date(v).getTime() - new Date(debut).getTime()) / 86400000) : p.immobilisation_jrs;
-                    return { ...p, date_fin_reparation: v, immobilisation_jrs: jrs != null && jrs >= 0 ? jrs : p.immobilisation_jrs };
+                    const immo = calcImmo(p.date_indisponibilite, v);
+                    return { ...p, date_fin_reparation: v, ...(immo !== null ? { immobilisation_jrs: immo } : {}) };
                   });
                 }} />
                 <div>
