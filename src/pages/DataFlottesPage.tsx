@@ -12,11 +12,10 @@ import type { CoutFlotte, FiltresCouts, CoutsFilters } from "@/types";
 import ChartFilterBar, { ChartFilter, CHART_FILTER_EMPTY, applyChartFilter } from "@/components/ChartFilterBar";
 
 
-const TYPE_COUT_OPTIONS = ["TOTAL", "CARBURANT", "DISTANCE", "ASS", "ENT", "LOCAT", "PEA", "REP"];
+const TYPE_COUT_OPTIONS = ["TOTAL", "DISTANCE", "ASS", "ENT", "LOCAT", "PEA", "REP"];
 
 const TYPE_COUT_LABELS: Record<string, string> = {
   ASS: "Assurance",
-  CARBURANT: "Carburant",
   DISTANCE: "Distance",
   ENT: "Entretien",
   LOCAT: "Location",
