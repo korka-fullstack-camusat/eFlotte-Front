@@ -61,20 +61,31 @@ export default function EntretiensPage() {
   const applyFilters  = () => { setFilters(draft); setFilterModal(false); };
   const resetFilters  = () => { setDraft({}); setFilters({}); setFilterModal(false); };
 
+  // Filtre rapide vidange
+  const [vidangeFilter, setVidangeFilter] = useState<"" | "effectuee" | "en_cours">("");
+
   const filtered = entretiens.filter(e => {
     if (filters.type_location && e.type_location !== filters.type_location) return false;
     if (filters.fournisseur   && e.fournisseur   !== filters.fournisseur)   return false;
     if (filters.type_vehicule && e.type_vehicule !== filters.type_vehicule) return false;
+    if (vidangeFilter) {
+      const sv = (e.type_location ?? "").toUpperCase();
+      if (vidangeFilter === "effectuee" && !sv.includes("EFFECT")) return false;
+      if (vidangeFilter === "en_cours"  && !sv.includes("COURS"))  return false;
+    }
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return [e.plaque_immatriculation, e.nom_chauffeur, e.fournisseur, e.type_vehicule, e.type_location]
       .some(v => (v ?? "").toLowerCase().includes(q));
   });
 
+  const nbEffectuee = entretiens.filter(e => (e.type_location ?? "").toUpperCase().includes("EFFECT")).length;
+  const nbEnCours   = entretiens.filter(e => (e.type_location ?? "").toUpperCase().includes("COURS")).length;
+
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedEntretiens = filtered.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
-  useEffect(() => { setPage(1); }, [search, filters]);
+  useEffect(() => { setPage(1); }, [search, filters, vidangeFilter]);
 
 
   const openCharts = () => setShowCharts(true);
@@ -229,16 +240,23 @@ export default function EntretiensPage() {
         </div>
       </div>
 
-      {/* Légende */}
-      <div className="flex items-center gap-4 mb-3 px-1">
-        <span className="flex items-center gap-1.5 text-xs text-gray-600">
-          <span className="inline-block w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-400"></span>
-          Vidange effectuée
-        </span>
-        <span className="flex items-center gap-1.5 text-xs text-gray-600">
-          <span className="inline-block w-3 h-3 rounded-sm bg-amber-200 border border-amber-400"></span>
-          Vidange en cours
-        </span>
+      {/* Filtre rapide vidange + légende */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <button onClick={() => setVidangeFilter("")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${vidangeFilter === "" ? "bg-camublue-900 text-white border-camublue-900" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+          Tous <span className="opacity-70">({entretiens.length})</span>
+        </button>
+        <button onClick={() => setVidangeFilter(vidangeFilter === "effectuee" ? "" : "effectuee")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${vidangeFilter === "effectuee" ? "bg-emerald-600 text-white border-emerald-600" : "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"}`}>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+          Vidange effectuée <span className="opacity-70">({nbEffectuee})</span>
+        </button>
+        <button onClick={() => setVidangeFilter(vidangeFilter === "en_cours" ? "" : "en_cours")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${vidangeFilter === "en_cours" ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"}`}>
+          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+          Vidange en cours <span className="opacity-70">({nbEnCours})</span>
+        </button>
+        <span className="ml-auto text-xs text-gray-400">{filtered.length} résultat{filtered.length !== 1 ? "s" : ""}</span>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
