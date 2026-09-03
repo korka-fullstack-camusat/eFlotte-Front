@@ -215,16 +215,26 @@ export default function CarburantPage() {
     setStats(data);
   }, [carGroup, typeCarb]);
 
-  // Charge toutes les données (sans filtre mois/annee tant que la migration DB n'est pas appliquée)
+  // Charge toutes les données en mémoire, filtre par mois côté client via dernier_plein
   const fetchMonthData = useCallback(async () => {
     const params: Record<string, string | number> = { page: 1, page_size: 9999 };
     if (carGroup) params.car_group = carGroup;
     if (typeCarb) params.type_carburant = typeCarb;
     const { data } = await axios.get("/api/carburant", { params });
+    const allRows: CarburantRow[] = data.items;
+    // Filtre client par mois (dernier_plein si disponible, sinon mois DB)
+    const forMonth = allRows.filter(r => {
+      if (r.dernier_plein) {
+        return new Date(r.dernier_plein).getMonth() + 1 === selectedMois;
+      }
+      return r.mois === selectedMois;
+    });
+    // Si aucune donnée pour ce mois, afficher toutes les données (fallback)
+    const rows = forMonth.length > 0 ? forMonth : allRows;
     const map = new Map<string, CarburantRow>();
-    (data.items as CarburantRow[]).forEach(r => map.set(r.matricule, r));
+    rows.forEach(r => map.set(r.matricule, r));
     setMonthData(map);
-  }, [carGroup, typeCarb]);
+  }, [selectedMois, carGroup, typeCarb]);
 
   const fetchFiltres = async () => {
     const { data } = await axios.get("/api/carburant/filtres");
@@ -238,13 +248,13 @@ export default function CarburantPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // À chaque changement de mois/année/filtres : recharger données du mois + stats
+  // À chaque changement de mois/filtres : recharger données du mois + stats
   useEffect(() => {
     setPage(1);
     fetchMonthData();
     fetchStats();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carGroup, typeCarb]);
+  }, [selectedMois, carGroup, typeCarb]);
 
   // Après un import : rafraîchir aussi la liste de référence
   const refreshAll = async () => {
