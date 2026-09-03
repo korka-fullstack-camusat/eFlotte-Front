@@ -73,26 +73,33 @@ export default function EntretienBisPage() {
   const applyFilters = () => { setFilters(draft); setFilterModal(false); };
   const resetFilters = () => { setDraft({}); setFilters({}); setFilterModal(false); };
 
-  // Filtre rapide vidange
-  const [vidangeFilter, setVidangeFilter] = useState<"" | "effectuee" | "en_cours">("");
+  // Filtre rapide par statut — valeurs dérivées du tableau
+  const [vidangeFilter, setVidangeFilter] = useState<string>("");
+
+  const statutCounts = entretiens.reduce<Record<string, number>>((acc, e) => {
+    const s = e.statut ?? "";
+    if (s) acc[s] = (acc[s] ?? 0) + 1;
+    return acc;
+  }, {});
+  const statutOptions = Object.entries(statutCounts).sort((a, b) => b[1] - a[1]);
+
+  const statutColor = (s: string) => {
+    const u = s.toUpperCase();
+    if (u.includes("EFFECT")) return { chip: "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100", active: "bg-emerald-600 text-white border-emerald-600" };
+    if (u.includes("COURS"))  return { chip: "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100",     active: "bg-amber-500 text-white border-amber-500" };
+    return { chip: "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200", active: "bg-gray-600 text-white border-gray-600" };
+  };
 
   const filtered = entretiens.filter(e => {
     if (filters.rt     && e.rt     !== filters.rt)     return false;
     if (filters.statut && e.statut !== filters.statut) return false;
     if (filters.modele && e.modele !== filters.modele) return false;
-    if (vidangeFilter) {
-      const sv = (e.statut ?? "").toUpperCase();
-      if (vidangeFilter === "effectuee" && !sv.includes("EFFECT")) return false;
-      if (vidangeFilter === "en_cours"  && !sv.includes("COURS"))  return false;
-    }
+    if (vidangeFilter && e.statut !== vidangeFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return [e.plaque_immatriculation, e.rt, e.statut, e.modele, e.notes]
       .some(v => (v ?? "").toLowerCase().includes(q));
   });
-
-  const nbEffectuee = entretiens.filter(e => (e.statut ?? "").toUpperCase().includes("EFFECT")).length;
-  const nbEnCours   = entretiens.filter(e => (e.statut ?? "").toUpperCase().includes("COURS")).length;
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedEntretiens = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -269,22 +276,23 @@ export default function EntretienBisPage() {
         </div>
       </div>
 
-      {/* Filtre rapide vidange + légende */}
+      {/* Filtre rapide statut vidange */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button onClick={() => setVidangeFilter("")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${vidangeFilter === "" ? "bg-camublue-900 text-white border-camublue-900" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
-          Tous <span className="opacity-70">({entretiens.length})</span>
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${vidangeFilter === "" ? "bg-camublue-900 text-white border-camublue-900" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}>
+          Tous ({entretiens.length})
         </button>
-        <button onClick={() => setVidangeFilter(vidangeFilter === "effectuee" ? "" : "effectuee")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${vidangeFilter === "effectuee" ? "bg-emerald-600 text-white border-emerald-600" : "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"}`}>
-          <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-          Vidange effectuée <span className="opacity-70">({nbEffectuee})</span>
-        </button>
-        <button onClick={() => setVidangeFilter(vidangeFilter === "en_cours" ? "" : "en_cours")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${vidangeFilter === "en_cours" ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"}`}>
-          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
-          Vidange en cours <span className="opacity-70">({nbEnCours})</span>
-        </button>
+        {statutOptions.map(([s, count]) => {
+          const colors = statutColor(s);
+          const isActive = vidangeFilter === s;
+          return (
+            <button key={s} onClick={() => setVidangeFilter(isActive ? "" : s)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${isActive ? colors.active : colors.chip}`}>
+              <span className={`w-2 h-2 rounded-full inline-block ${isActive ? "bg-white/70" : s.toUpperCase().includes("EFFECT") ? "bg-emerald-400" : s.toUpperCase().includes("COURS") ? "bg-amber-400" : "bg-gray-400"}`}></span>
+              {s} ({count})
+            </button>
+          );
+        })}
         <span className="ml-auto text-xs text-gray-400">{filtered.length} résultat{filtered.length !== 1 ? "s" : ""}</span>
       </div>
 
