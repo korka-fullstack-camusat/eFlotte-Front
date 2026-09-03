@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import {
   Upload, Fuel, TrendingUp, DollarSign, Route,
-  X, Search, BarChart2, Filter, Pencil, Calendar, ChevronDown,
+  X, Search, BarChart2, Filter, Pencil, Calendar, ChevronDown, Plus,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -20,6 +20,7 @@ interface CarburantRow {
   id: number;
   matricule: string;
   mois: number;
+  annee: number;
   quantite_totale: number | null;
   montant_total: number | null;
   mt_ht: number | null;
@@ -151,10 +152,13 @@ function computeChartData(rows: CarburantRow[]) {
   return { consomData, coutData, repartData };
 }
 
+const THIS_YEAR = new Date().getFullYear();
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CarburantPage() {
-  const [selectedMois, setSelectedMois] = useState<number>(1);
+  const [selectedMois, setSelectedMois] = useState<number>(new Date().getMonth() + 1);
+  const selectedAnnee = THIS_YEAR;
   const [moisOpen,     setMoisOpen]     = useState(false);
 
   // Liste de référence : tous les matricules connus (toutes périodes confondues)
@@ -185,6 +189,11 @@ export default function CarburantPage() {
   const [loadingCharts, setLoadingCharts] = useState(false);
 
   const [importing, setImporting] = useState(false);
+  const [importModal, setImportModal] = useState(false);
+  const [importMois,  setImportMois]  = useState<number>(new Date().getMonth() + 1);
+  const [addModal,  setAddModal]  = useState(false);
+  const [addForm,   setAddForm]   = useState({ matricule: "", mois: new Date().getMonth() + 1, type_carburant: "", quantite_totale: "", montant_total: "", distance_totale: "", car_group: "" });
+  const [addSaving, setAddSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const hasFilters = !!(carGroup || typeCarb);
@@ -229,7 +238,7 @@ export default function CarburantPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // À chaque changement de mois/filtres : recharger données du mois + stats
+  // À chaque changement de mois/année/filtres : recharger données du mois + stats
   useEffect(() => {
     setPage(1);
     fetchMonthData();
@@ -250,7 +259,7 @@ export default function CarburantPage() {
   const pageSlice   = filteredMatricules.slice((page - 1) * pageSize, page * pageSize);
   // Lignes affichées : matricule fixe + données du mois (ou vide si absent)
   const displayRows: CarburantRow[] = pageSlice.map(m => monthData.get(m) ?? {
-    id: -1, matricule: m, mois: selectedMois,
+    id: -1, matricule: m, mois: selectedMois, annee: selectedAnnee,
     quantite_totale: null, montant_total: null, mt_ht: null, prix_unitaire: null,
     type_carburant: null, distance_totale: null, distance_gps: null,
     car_group: null, dernier_plein: null, driver_name: null,
@@ -273,25 +282,27 @@ export default function CarburantPage() {
 
   // ── Import ────────────────────────────────────────────────────────────────
 
+  const openImportModal = () => {
+    setImportMois(selectedMois);
+    setImportModal(true);
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
+    setImportModal(false);
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const { data } = await axios.post(`/api/carburant/import?mois=${selectedMois}`, fd);
-      const moisImporte: number = data.mois_detecte ?? selectedMois;
-      const nomMois = MOIS_NOMS[moisImporte - 1];
-      toast.success(`Import ${nomMois} : ${data.created} créés, ${data.updated} mis à jour`);
+      const { data } = await axios.post(`/api/carburant/import?mois=${importMois}&annee=${THIS_YEAR}`, fd);
+      const moisImporte: number = data.mois_detecte ?? importMois;
+      toast.success(`Import ${MOIS_NOMS[moisImporte - 1]} ${THIS_YEAR} : ${data.created} créés, ${data.updated} mis à jour`);
       if (data.errors?.length) {
         toast.error(`${data.errors.length} erreur(s) — voir console`, { duration: 6000 });
         console.warn("Erreurs import carburant:", data.errors);
       }
-      // Switcher automatiquement sur le mois détecté dans le fichier
-      if (moisImporte !== selectedMois) {
-        setSelectedMois(moisImporte);
-      }
+      setSelectedMois(moisImporte);
       setPage(1);
       await refreshAll();
     } catch (err: any) {
@@ -299,6 +310,33 @@ export default function CarburantPage() {
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  // ── Ajout manuel ──────────────────────────────────────────────────────────
+
+  const handleAddForm = async () => {
+    if (!addForm.matricule.trim()) { toast.error("Matricule requis"); return; }
+    setAddSaving(true);
+    try {
+      await axios.post("/api/carburant", {
+        matricule:       addForm.matricule.trim().toUpperCase(),
+        mois:            addForm.mois,
+        annee:           THIS_YEAR,
+        type_carburant:  addForm.type_carburant || null,
+        quantite_totale: addForm.quantite_totale ? parseFloat(addForm.quantite_totale) : null,
+        montant_total:   addForm.montant_total   ? parseFloat(addForm.montant_total)   : null,
+        distance_totale: addForm.distance_totale ? parseFloat(addForm.distance_totale) : null,
+        car_group:       addForm.car_group       || null,
+      });
+      toast.success("Entrée ajoutée");
+      setAddModal(false);
+      setSelectedMois(addForm.mois);
+      await refreshAll();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur");
+    } finally {
+      setAddSaving(false);
     }
   };
 
@@ -363,11 +401,9 @@ export default function CarburantPage() {
           <div>
             <h1 className="text-2xl font-bold text-camublue-900">Suivi Carburant</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              {MOIS_NOMS[selectedMois - 1]} — {filteredMatricules.length} véhicule{filteredMatricules.length !== 1 ? "s" : ""}
+              {MOIS_NOMS[selectedMois - 1]} {selectedAnnee} — {filteredMatricules.length} véhicule{filteredMatricules.length !== 1 ? "s" : ""}
               {monthData.size < allMatricules.length && (
-                <span className="ml-2 text-amber-500 text-xs">
-                  · {monthData.size} avec données
-                </span>
+                <span className="ml-2 text-amber-500 text-xs">· {monthData.size} avec données</span>
               )}
             </p>
           </div>
@@ -375,30 +411,23 @@ export default function CarburantPage() {
 
             {/* ── Sélecteur de mois ─────────────────────────────────────── */}
             <div className="relative">
-              <button
-                onClick={() => setMoisOpen(v => !v)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-camublue-900/40 text-camublue-900 rounded-xl text-sm font-semibold transition shadow-sm"
-              >
+              <button onClick={() => setMoisOpen(v => !v)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-camublue-900/40 text-camublue-900 rounded-xl text-sm font-semibold transition shadow-sm">
                 <Calendar size={15} />
                 <span>{MOIS_NOMS[selectedMois - 1]}</span>
                 <ChevronDown size={13} className={`transition-transform ${moisOpen ? "rotate-180" : ""}`} />
               </button>
               {moisOpen && (
                 <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-30 p-3 w-64">
-                  <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2 px-1">Choisir le mois</p>
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2 px-1">Choisir le mois — {THIS_YEAR}</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {MOIS_NOMS.map((nom, i) => {
                       const m = i + 1;
                       return (
-                        <button
-                          key={m}
-                          onClick={() => { setSelectedMois(m); setMoisOpen(false); }}
+                        <button key={m} onClick={() => { setSelectedMois(m); setMoisOpen(false); }}
                           className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition ${
-                            selectedMois === m
-                              ? "bg-camublue-900 text-white"
-                              : "bg-gray-50 text-gray-600 hover:bg-camublue-900/10 hover:text-camublue-900"
-                          }`}
-                        >
+                            selectedMois === m ? "bg-camublue-900 text-white" : "bg-gray-50 text-gray-600 hover:bg-camublue-900/10 hover:text-camublue-900"
+                          }`}>
                           {nom}
                         </button>
                       );
@@ -410,13 +439,11 @@ export default function CarburantPage() {
 
             {/* Filtre rapide ESSENCE / GAZOIL */}
             <div className="flex rounded-xl overflow-hidden border border-gray-200 text-xs font-semibold">
-              <button
-                onClick={() => setTypeCarb(typeCarb === "GAZOIL" ? "" : "GAZOIL")}
+              <button onClick={() => setTypeCarb(typeCarb === "GAZOIL" ? "" : "GAZOIL")}
                 className={`px-3 py-2 transition ${typeCarb === "GAZOIL" ? "bg-blue-700 text-white" : "bg-white text-blue-700 hover:bg-blue-50"}`}>
                 Gazoil
               </button>
-              <button
-                onClick={() => setTypeCarb(typeCarb === "ESSENCE" ? "" : "ESSENCE")}
+              <button onClick={() => setTypeCarb(typeCarb === "ESSENCE" ? "" : "ESSENCE")}
                 className={`px-3 py-2 border-l border-gray-200 transition ${typeCarb === "ESSENCE" ? "bg-orange-500 text-white" : "bg-white text-orange-600 hover:bg-orange-50"}`}>
                 Essence
               </button>
@@ -424,10 +451,10 @@ export default function CarburantPage() {
 
             <button onClick={openCharts}
               className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
-              <BarChart2 size={15} /><span>Voir graphiques</span>
+              <BarChart2 size={15} /><span>Graphiques</span>
             </button>
             <button onClick={openFilterModal}
-              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm relative">
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-camublue-900/40 text-camublue-900 rounded-xl text-sm font-semibold transition shadow-sm relative">
               <Filter size={15} /><span>Filtres</span>
               {hasFilters && (
                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center font-bold">
@@ -435,10 +462,14 @@ export default function CarburantPage() {
                 </span>
               )}
             </button>
-            <button onClick={() => fileRef.current?.click()} disabled={importing}
-              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm disabled:opacity-60">
+            <button onClick={openImportModal} disabled={importing}
+              className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition shadow-sm disabled:opacity-60">
               <Upload size={15} />
-              {importing ? "Import en cours…" : `Importer — ${MOIS_NOMS[selectedMois - 1]}`}
+              {importing ? "Import…" : "Importer"}
+            </button>
+            <button onClick={() => setAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+              <Plus size={15} /><span>Ajouter</span>
             </button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
           </div>
@@ -667,6 +698,108 @@ export default function CarburantPage() {
                   className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">Réinitialiser</button>
                 <button onClick={applyFilters}
                   className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition">Appliquer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Modal Import — choix de la période ══════════════════════════════ */}
+      {importModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setImportModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-5 py-3.5 flex items-center justify-between">
+              <p className="text-white font-bold text-sm">Importer — Choisir la période</p>
+              <button onClick={() => setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-500">Sélectionnez le mois concerné par ce fichier ({THIS_YEAR}).</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {MOIS_NOMS.map((nom, i) => {
+                  const m = i + 1;
+                  return (
+                    <button key={m} onClick={() => setImportMois(m)}
+                      className={`py-2 rounded-lg text-xs font-semibold transition ${importMois === m ? "bg-camublue-900 text-white" : "bg-gray-50 text-gray-600 hover:bg-camublue-900/10"}`}>
+                      {nom}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => fileRef.current?.click()}
+                className="w-full bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition flex items-center justify-center gap-2">
+                <Upload size={15} />
+                Choisir le fichier — {MOIS_NOMS[importMois - 1]} {THIS_YEAR}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Modal Ajouter ════════════════════════════════════════════════════ */}
+      {addModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setAddModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-camublue-900 px-5 py-3.5 flex items-center justify-between">
+              <p className="text-white font-bold text-sm">Ajouter une entrée carburant</p>
+              <button onClick={() => setAddModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Matricule *</label>
+                  <input className="input-base w-full uppercase" placeholder="AA-0000-A"
+                    value={addForm.matricule} onChange={e => setAddForm(f => ({ ...f, matricule: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Type carburant</label>
+                  <select className="input-base w-full" value={addForm.type_carburant} onChange={e => setAddForm(f => ({ ...f, type_carburant: e.target.value }))}>
+                    <option value="">— Sélectionner —</option>
+                    <option value="GAZOIL">GAZOIL</option>
+                    <option value="ESSENCE">ESSENCE</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Mois ({THIS_YEAR})</label>
+                <select className="input-base w-full" value={addForm.mois} onChange={e => setAddForm(f => ({ ...f, mois: Number(e.target.value) }))}>
+                  {MOIS_NOMS.map((nom, i) => <option key={i+1} value={i+1}>{nom}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Quantité (L)</label>
+                  <input type="number" className="input-base w-full" placeholder="0"
+                    value={addForm.quantite_totale} onChange={e => setAddForm(f => ({ ...f, quantite_totale: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Montant (FCFA)</label>
+                  <input type="number" className="input-base w-full" placeholder="0"
+                    value={addForm.montant_total} onChange={e => setAddForm(f => ({ ...f, montant_total: e.target.value }))} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Distance (km)</label>
+                  <input type="number" className="input-base w-full" placeholder="0"
+                    value={addForm.distance_totale} onChange={e => setAddForm(f => ({ ...f, distance_totale: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Pôle / CarGroup</label>
+                  <input className="input-base w-full"
+                    value={addForm.car_group} onChange={e => setAddForm(f => ({ ...f, car_group: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setAddModal(false)}
+                  className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">Annuler</button>
+                <button onClick={handleAddForm} disabled={addSaving}
+                  className="flex-[2] bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition disabled:opacity-60">
+                  {addSaving ? "Enregistrement…" : "Ajouter"}
+                </button>
               </div>
             </div>
           </div>
