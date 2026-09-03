@@ -270,9 +270,15 @@ export default function EntretiensPage() {
                   return (
                   <tr key={e.id} className={`${rowCls} cursor-pointer`} onClick={() => setManageRow(e)}>
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      {e.type_location ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{e.type_location}</span>
-                      ) : "—"}
+                      {e.type_location ? (() => {
+                        const sv = (e.type_location ?? "").toUpperCase();
+                        const cls = sv.includes("EFFECT")
+                          ? "bg-emerald-100 text-emerald-700"
+                          : sv.includes("COURS")
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-gray-100 text-gray-600";
+                        return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{e.type_location}</span>;
+                      })() : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{e.fournisseur || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{e.type_vehicule || "—"}</td>

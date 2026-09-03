@@ -306,7 +306,17 @@ export default function EntretienBisPage() {
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{e.rt}</span>
                       ) : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{e.statut || "—"}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      {e.statut ? (() => {
+                        const sv = (e.statut ?? "").toUpperCase();
+                        const cls = sv.includes("EFFECT")
+                          ? "bg-emerald-100 text-emerald-700"
+                          : sv.includes("COURS")
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-gray-100 text-gray-600";
+                        return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}>{e.statut}</span>;
+                      })() : "—"}
+                    </td>
                     <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{e.modele || "—"}</td>
                     <td className="px-4 py-2.5 font-semibold text-gray-700 whitespace-nowrap">
                       <div className="flex items-center gap-1.5"><Wrench size={13} className="text-gray-400" />{e.plaque_immatriculation}</div>
