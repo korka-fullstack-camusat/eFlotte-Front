@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import {
   Upload, Fuel, TrendingUp, DollarSign, Route,
-  X, Search, BarChart2, Filter, Pencil, Calendar, ChevronDown, Plus,
+  X, Search, BarChart2, Filter, Pencil, Calendar, Plus,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -159,7 +159,6 @@ const THIS_YEAR = new Date().getFullYear();
 export default function CarburantPage() {
   const [selectedMois, setSelectedMois] = useState<number>(new Date().getMonth() + 1);
   const selectedAnnee = THIS_YEAR;
-  const [moisOpen,     setMoisOpen]     = useState(false);
 
   // Liste de référence : tous les matricules connus (toutes périodes confondues)
   const [allMatricules, setAllMatricules] = useState<string[]>([]);
@@ -420,31 +419,16 @@ export default function CarburantPage() {
           <div className="flex items-center gap-2 flex-wrap">
 
             {/* ── Sélecteur de mois ─────────────────────────────────────── */}
-            <div className="relative">
-              <button onClick={() => setMoisOpen(v => !v)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-camublue-900/40 text-camublue-900 rounded-xl text-sm font-semibold transition shadow-sm">
-                <Calendar size={15} />
-                <span>{MOIS_NOMS[selectedMois - 1]}</span>
-                <ChevronDown size={13} className={`transition-transform ${moisOpen ? "rotate-180" : ""}`} />
-              </button>
-              {moisOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl z-30 p-3 w-64">
-                  <p className="text-[10px] text-gray-400 uppercase font-semibold mb-2 px-1">Choisir le mois — {THIS_YEAR}</p>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {MOIS_NOMS.map((nom, i) => {
-                      const m = i + 1;
-                      return (
-                        <button key={m} onClick={() => { setSelectedMois(m); setMoisOpen(false); }}
-                          className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition ${
-                            selectedMois === m ? "bg-camublue-900 text-white" : "bg-gray-50 text-gray-600 hover:bg-camublue-900/10 hover:text-camublue-900"
-                          }`}>
-                          {nom}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+            <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl shadow-sm">
+              <Calendar size={15} className="text-camublue-900 shrink-0" />
+              <select
+                value={selectedMois}
+                onChange={e => setSelectedMois(Number(e.target.value))}
+                className="text-sm font-semibold text-camublue-900 bg-transparent outline-none cursor-pointer">
+                {MOIS_NOMS.map((nom, i) => (
+                  <option key={i + 1} value={i + 1}>{nom}</option>
+                ))}
+              </select>
             </div>
 
             {/* Filtre rapide ESSENCE / GAZOIL */}
@@ -592,8 +576,6 @@ export default function CarburantPage() {
         </div>
       </div>
 
-      {/* Fermer dropdown mois en cliquant ailleurs */}
-      {moisOpen && <div className="fixed inset-0 z-20" onClick={() => setMoisOpen(false)} />}
 
       {/* ══ Modal Détail ligne ════════════════════════════════════════════════ */}
       {detailRow && (
