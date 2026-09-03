@@ -206,13 +206,36 @@ export default function CarburantPage() {
     setAllMatricules(unique);
   };
 
-  const fetchStats = useCallback(async () => {
-    const params: Record<string, string | number> = {};
-    if (carGroup) params.car_group = carGroup;
-    if (typeCarb) params.type_carburant = typeCarb;
-    const { data } = await axios.get("/api/carburant/stats", { params });
-    setStats(data);
-  }, [carGroup, typeCarb]);
+  // Stats calculées côté client depuis monthData (déjà filtré par mois)
+  const computeStats = useCallback((data: Map<string, CarburantRow>) => {
+    const rows = [...data.values()];
+    const gazoil  = rows.filter(r => (r.type_carburant || "").toUpperCase() === "GAZOIL");
+    const essence = rows.filter(r => (r.type_carburant || "").toUpperCase() === "ESSENCE");
+    const sum = (arr: CarburantRow[], k: keyof CarburantRow) =>
+      arr.reduce((acc, r) => acc + ((r[k] as number) || 0), 0);
+    const top = (arr: CarburantRow[], key: keyof CarburantRow) =>
+      [...arr].sort((a, b) => ((b[key] as number) || 0) - ((a[key] as number) || 0)).slice(0, 10);
+    setStats({
+      total_vehicules: rows.length,
+      total_litres:    Math.round(sum(rows, "quantite_totale") * 100) / 100,
+      total_montant:   Math.round(sum(rows, "montant_total")   * 100) / 100,
+      total_distance:  Math.round(sum(rows, "distance_totale") * 100) / 100,
+      nb_gazoil:       gazoil.length,
+      nb_essence:      essence.length,
+      litres_gazoil:   Math.round(sum(gazoil,  "quantite_totale") * 100) / 100,
+      litres_essence:  Math.round(sum(essence, "quantite_totale") * 100) / 100,
+      montant_gazoil:  Math.round(sum(gazoil,  "montant_total")   * 100) / 100,
+      montant_essence: Math.round(sum(essence, "montant_total")   * 100) / 100,
+      top_consommateurs: top(rows, "quantite_totale").map(r => ({
+        matricule: r.matricule, type_carburant: r.type_carburant ?? "",
+        quantite_totale: r.quantite_totale ?? 0, car_group: r.car_group ?? "",
+      })),
+      top_couts: top(rows, "montant_total").map(r => ({
+        matricule: r.matricule, type_carburant: r.type_carburant ?? "",
+        montant_total: r.montant_total ?? 0, car_group: r.car_group ?? "",
+      })),
+    });
+  }, []);
 
   // Charge toutes les données en mémoire, filtre par mois côté client via dernier_plein
   const fetchMonthData = useCallback(async () => {
@@ -233,7 +256,8 @@ export default function CarburantPage() {
     const map = new Map<string, CarburantRow>();
     rows.forEach(r => map.set(r.matricule, r));
     setMonthData(map);
-  }, [selectedMois, carGroup, typeCarb]);
+    computeStats(map);
+  }, [selectedMois, carGroup, typeCarb, computeStats]);
 
   const fetchFiltres = async () => {
     const { data } = await axios.get("/api/carburant/filtres");
@@ -247,17 +271,16 @@ export default function CarburantPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // À chaque changement de mois/filtres : recharger données du mois + stats
+  // À chaque changement de mois/filtres : recharger données (stats recalculées dans fetchMonthData)
   useEffect(() => {
     setPage(1);
     fetchMonthData();
-    fetchStats();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMois, carGroup, typeCarb]);
 
   // Après un import : rafraîchir aussi la liste de référence
   const refreshAll = async () => {
-    await Promise.all([fetchAllMatricules(), fetchMonthData(), fetchStats(), fetchFiltres()]);
+    await Promise.all([fetchAllMatricules(), fetchMonthData(), fetchFiltres()]);
   };
 
   // ── Vue paginée : filtre sur allMatricules + search ───────────────────────
