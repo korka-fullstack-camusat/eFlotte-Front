@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import {
-  Search, Filter, Car, CheckCircle, Wrench, Ban, X, Save, BarChart2,
+  Search, Filter, Car, CheckCircle, Wrench, Ban, X, Save, BarChart2, Upload,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -332,8 +332,39 @@ export default function RecapPannePage() {
   const [quickEdit, setQuickEdit]     = useState<QuickEdit | null>(null);
   const [showCharts, setShowCharts]   = useState(false);
   const [chartFilter, setChartFilter] = useState<ChartFilter>({ ...CHART_FILTER_EMPTY, annee, mode: "annee" });
+  const [importing, setImporting]     = useState(false);
 
   const mois = useMemo(() => isoMois(annee), [annee]);
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const r = await axios.post("/api/suivi-pannes/recap/import", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const { created, updated, errors } = r.data;
+      if (errors?.length) {
+        toast.error(`Import terminé avec ${errors.length} erreur(s)`);
+      } else {
+        toast.success(`Import OK — ${created} ajouté(s), ${updated} mis à jour`);
+      }
+      // Recharger les données
+      setLoading(true);
+      axios.get("/api/suivi-pannes/recap", { params: { annee } })
+        .then(res => { setData(res.data); setRows(res.data.vehicules ?? []); })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -448,6 +479,14 @@ export default function RecapPannePage() {
               className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
               <BarChart2 size={15} /><span>Voir graphiques</span>
             </button>
+
+            {!isViewer && (
+              <label className={`flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm cursor-pointer ${importing ? "opacity-60 pointer-events-none" : ""}`}>
+                <Upload size={15} />
+                <span>{importing ? "Import…" : "Importer"}</span>
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
+              </label>
+            )}
 
             <button onClick={() => { setDraftGroup(filterGroup); setDraftFuel(filterFuel); setFilterModal(true); }}
               className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm relative">
