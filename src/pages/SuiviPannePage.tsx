@@ -219,8 +219,17 @@ export default function SuiviPannePage() {
     setQuickSaving(true);
     const { item, field, type } = quickEdit;
     const val = quickValue === "" ? null : (type === "number" ? Number(quickValue) : quickValue);
+    const patch: Record<string, unknown> = { [field]: val };
+    if (field === "date_fin_reparation" && quickValue && item.date_indisponibilite) {
+      const diff = Math.round((new Date(quickValue).getTime() - new Date(item.date_indisponibilite).getTime()) / 86400000);
+      if (diff >= 0) patch.immobilisation_jrs = diff;
+    }
+    if (field === "date_indisponibilite" && quickValue && item.date_fin_reparation) {
+      const diff = Math.round((new Date(item.date_fin_reparation).getTime() - new Date(quickValue).getTime()) / 86400000);
+      if (diff >= 0) patch.immobilisation_jrs = diff;
+    }
     try {
-      await suiviPanneService.update(item.id, { [field]: val } as any);
+      await suiviPanneService.update(item.id, patch as any);
       toast.success("Mis à jour");
       setQuickEdit(null);
       load();
@@ -462,8 +471,20 @@ export default function SuiviPannePage() {
                 <Field label="Garage" value={form.garage ?? ""} onChange={v => setForm(p => ({ ...p, garage: v }))} />
                 <Field label="Projet" value={form.projet ?? ""} onChange={v => setForm(p => ({ ...p, projet: v }))} />
                 <Field label="Site" value={form.site ?? ""} onChange={v => setForm(p => ({ ...p, site: v }))} />
-                <Field label="Date d'indisponibilité" type="date" value={form.date_indisponibilite ?? ""} onChange={v => setForm(p => ({ ...p, date_indisponibilite: v }))} />
-                <Field label="Date de fin de réparation" type="date" value={form.date_fin_reparation ?? ""} onChange={v => setForm(p => ({ ...p, date_fin_reparation: v }))} />
+                <Field label="Date d'indisponibilité" type="date" value={form.date_indisponibilite ?? ""} onChange={v => {
+                  setForm(p => {
+                    const fin = p.date_fin_reparation;
+                    const jrs = fin && v ? Math.round((new Date(fin).getTime() - new Date(v).getTime()) / 86400000) : p.immobilisation_jrs;
+                    return { ...p, date_indisponibilite: v, immobilisation_jrs: jrs != null && jrs >= 0 ? jrs : p.immobilisation_jrs };
+                  });
+                }} />
+                <Field label="Date de fin de réparation" type="date" value={form.date_fin_reparation ?? ""} onChange={v => {
+                  setForm(p => {
+                    const debut = p.date_indisponibilite;
+                    const jrs = debut && v ? Math.round((new Date(v).getTime() - new Date(debut).getTime()) / 86400000) : p.immobilisation_jrs;
+                    return { ...p, date_fin_reparation: v, immobilisation_jrs: jrs != null && jrs >= 0 ? jrs : p.immobilisation_jrs };
+                  });
+                }} />
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">Immobilisation (jrs)</label>
                   <input type="number" step="0.5" min="0" value={form.immobilisation_jrs ?? ""}
