@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "axios";
 import {
   Upload, Fuel, TrendingUp, DollarSign, Route,
@@ -160,19 +160,23 @@ const THIS_YEAR = new Date().getFullYear();
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CarburantPage() {
-  // Initialisé au mois courant, sera remplacé dès le montage par le dernier mois en DB
-  const [selectedMois, setSelectedMois] = useState<number>(new Date().getMonth() + 1);
+  const [selectedMois,  setSelectedMois]  = useState<number>(new Date().getMonth() + 1);
   const [selectedAnnee, setSelectedAnnee] = useState<number>(THIS_YEAR);
 
   const [rows,    setRows]    = useState<CarburantRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [stats,   setStats]   = useState<Stats | null>(null);
   const [filtres, setFiltres] = useState<Filtres | null>(null);
 
-  const [search,   setSearch]   = useState("");
-  const [carGroup, setCarGroup] = useState("");
-  const [typeCarb, setTypeCarb] = useState("");
-  const [page,     setPage]     = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  // Cache en mémoire : clé = "annee-mois[-carGroup-typeCarb]"
+  const cache = useRef<Map<string, CarburantRow[]>>(new Map());
+
+  const [searchRaw, setSearchRaw] = useState("");
+  const [search,    setSearch]    = useState("");
+  const [carGroup,  setCarGroup]  = useState("");
+  const [typeCarb,  setTypeCarb]  = useState("");
+  const [page,      setPage]      = useState(1);
+  const [pageSize,  setPageSize]  = useState(15);
 
   const [showCharts,  setShowCharts]  = useState(false);
   const [filterModal, setFilterModal] = useState(false);
@@ -228,31 +232,50 @@ export default function CarburantPage() {
     });
   }, []);
 
-  // Accepte des overrides pour éviter le problème de closure stale après setSelectedMois/Annee
   const fetchMonthData = useCallback(async (overrideMois?: number, overrideAnnee?: number) => {
     const m = overrideMois ?? selectedMois;
     const a = overrideAnnee ?? selectedAnnee;
-    const params: Record<string, string | number> = { mois: m, annee: a, page: 1, page_size: 9999 };
-    if (carGroup) params.car_group = carGroup;
-    if (typeCarb) params.type_carburant = typeCarb;
-    const { data } = await axios.get("/api/carburant", { params });
-    const fetched: CarburantRow[] = data.items;
-    setRows(fetched);
-    computeStats(fetched);
+    const cacheKey = `${a}-${m}|${carGroup}|${typeCarb}`;
+
+    // 1. Afficher immédiatement les données en cache (stale-while-revalidate)
+    const cached = cache.current.get(cacheKey);
+    if (cached) {
+      setRows(cached);
+      computeStats(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    // 2. Revalider depuis le serveur en arrière-plan
+    try {
+      const params: Record<string, string | number> = { mois: m, annee: a, page: 1, page_size: 9999 };
+      if (carGroup) params.car_group = carGroup;
+      if (typeCarb) params.type_carburant = typeCarb;
+      const { data } = await axios.get("/api/carburant", { params });
+      const fetched: CarburantRow[] = data.items;
+      cache.current.set(cacheKey, fetched);
+      setRows(fetched);
+      computeStats(fetched);
+    } finally {
+      setLoading(false);
+    }
   }, [selectedMois, selectedAnnee, carGroup, typeCarb, computeStats]);
 
-  const fetchFiltres = async () => {
+  const fetchFiltres = useCallback(async () => {
     const { data } = await axios.get("/api/carburant/filtres");
     setFiltres(data);
-  };
+  }, []);
 
-  // Au montage : charger depuis la DB le dernier mois qui a des données
+  // Au montage : périodes + filtres en parallèle, puis sélectionner le dernier mois en DB
   useEffect(() => {
-    fetchFiltres();
-    axios.get("/api/carburant/periodes").then(({ data }) => {
-      if (data.length > 0) {
-        setSelectedMois(data[0].mois);
-        setSelectedAnnee(data[0].annee);
+    Promise.all([
+      axios.get("/api/carburant/periodes"),
+      fetchFiltres(),
+    ]).then(([{ data: periodes }]) => {
+      if (periodes.length > 0) {
+        setSelectedMois(periodes[0].mois);
+        setSelectedAnnee(periodes[0].annee);
       }
     }).catch(() => {});
   }, []); // eslint-disable-line
@@ -262,21 +285,38 @@ export default function CarburantPage() {
     fetchMonthData();
   }, [selectedMois, selectedAnnee, carGroup, typeCarb]); // eslint-disable-line
 
+  // Debounce de la recherche : mise à jour 200ms après la dernière frappe
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchRaw), 200);
+    return () => clearTimeout(t);
+  }, [searchRaw]);
+
   const refreshAll = async (overrideMois?: number, overrideAnnee?: number) => {
+    const m = overrideMois ?? selectedMois;
+    const a = overrideAnnee ?? selectedAnnee;
+    // Invalider le cache pour cette période avant de recharger
+    const cacheKey = `${a}-${m}|${carGroup}|${typeCarb}`;
+    cache.current.delete(cacheKey);
     await Promise.all([fetchMonthData(overrideMois, overrideAnnee), fetchFiltres()]);
   };
 
-  // ── Filtrage local + pagination ───────────────────────────────────────────
-  const filtered = rows.filter(r =>
-    !search ||
-    r.matricule.toLowerCase().includes(search.toLowerCase()) ||
-    (r.driver_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
-    (r.nom_chauffeur ?? "").toLowerCase().includes(search.toLowerCase()) ||
-    (r.car_group ?? "").toLowerCase().includes(search.toLowerCase()) ||
-    (r.code_projet ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  // ── Filtrage local (memoïsé) + pagination ────────────────────────────────
+  const filtered = useMemo(() => {
+    if (!search) return rows;
+    const q = search.toLowerCase();
+    return rows.filter(r =>
+      r.matricule.toLowerCase().includes(q) ||
+      (r.driver_name    ?? "").toLowerCase().includes(q) ||
+      (r.nom_chauffeur  ?? "").toLowerCase().includes(q) ||
+      (r.car_group      ?? "").toLowerCase().includes(q) ||
+      (r.code_projet    ?? "").toLowerCase().includes(q)
+    );
+  }, [rows, search]);
   const totalPages  = Math.ceil(filtered.length / pageSize);
-  const displayRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const displayRows = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  );
 
   // ── Charts modal ─────────────────────────────────────────────────────────
 
@@ -377,12 +417,18 @@ export default function CarburantPage() {
           matricule: row.matricule, mois: selectedMois, annee: selectedAnnee, [field]: parsed,
         });
         toast.success("Entrée créée");
+        cache.current.delete(`${selectedAnnee}-${selectedMois}|${carGroup}|${typeCarb}`);
         await fetchMonthData();
       } else {
         const res = await axios.patch(`/api/carburant/${row.id}`, { [field]: parsed });
         const data: CarburantRow = res.data;
         toast.success("Mis à jour");
-        setRows(prev => prev.map(r => r.id === data.id ? { ...r, ...data } as CarburantRow : r));
+        // Mise à jour optimiste + sync cache
+        setRows(prev => {
+          const next = prev.map(r => r.id === data.id ? { ...r, ...data } as CarburantRow : r);
+          cache.current.set(`${selectedAnnee}-${selectedMois}|${carGroup}|${typeCarb}`, next);
+          return next;
+        });
       }
       setQuickEdit(null);
     } catch (err: any) {
@@ -498,7 +544,7 @@ export default function CarburantPage() {
         <div className="flex justify-center mb-6">
           <div className="relative w-full max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" value={searchRaw} onChange={e => { setSearchRaw(e.target.value); setPage(1); }}
               placeholder="Rechercher par matricule, chauffeur, pôle…"
               className="input-base pl-9 w-full" />
           </div>
@@ -526,7 +572,17 @@ export default function CarburantPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayRows.length === 0 ? (
+                {loading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i} className={`border-t border-slate-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}>
+                      {Array.from({ length: 13 }).map((__, j) => (
+                        <td key={j} className="px-3 py-3">
+                          <div className="h-3 rounded bg-slate-200 animate-pulse" style={{ width: j === 0 ? "80px" : j === 1 ? "120px" : "60px" }} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : displayRows.length === 0 ? (
                   <tr>
                     <td colSpan={13} className="py-16 text-center text-gray-400">
                       Aucune donnée pour {MOIS_NOMS[selectedMois - 1]} {selectedAnnee}. Importez un fichier Excel.
