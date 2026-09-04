@@ -381,6 +381,8 @@ export default function RecapPannePage() {
   const fuelTypes = useMemo(() =>
     [...new Set(rows.map(v => v.type_carburant).filter(Boolean))].sort() as string[], [rows]);
 
+  const [kpiFilter, setKpiFilter] = useState<"" | "service" | "maintenance" | "immobilise">("");
+
   /* Lignes filtrées */
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -394,9 +396,7 @@ export default function RecapPannePage() {
         .some(f => (f ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [rows, search, filterGroup, filterFuel]);
-
-  const [kpiFilter, setKpiFilter] = useState<"" | "service" | "maintenance" | "immobilise">("");
+  }, [rows, search, filterGroup, filterFuel, kpiFilter]);
 
   /* KPIs calculés sur toutes les lignes (avant filtre KPI) */
   const kpiTotal       = rows.length;
