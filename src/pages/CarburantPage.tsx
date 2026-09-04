@@ -34,6 +34,9 @@ interface CarburantRow {
   nom_chauffeur: string | null;
   code_projet: string | null;
   num_carte: string | null;
+  conso_100: number | null;
+  vehicle_type: string | null;
+  dist_recommandee: number | null;
 }
 
 interface Stats {
@@ -224,10 +227,11 @@ export default function CarburantPage() {
     });
   }, []);
 
-  const fetchMonthData = useCallback(async () => {
-    const params: Record<string, string | number> = {
-      mois: selectedMois, annee: selectedAnnee, page: 1, page_size: 9999,
-    };
+  // Accepte des overrides pour éviter le problème de closure stale après setSelectedMois/Annee
+  const fetchMonthData = useCallback(async (overrideMois?: number, overrideAnnee?: number) => {
+    const m = overrideMois ?? selectedMois;
+    const a = overrideAnnee ?? selectedAnnee;
+    const params: Record<string, string | number> = { mois: m, annee: a, page: 1, page_size: 9999 };
     if (carGroup) params.car_group = carGroup;
     if (typeCarb) params.type_carburant = typeCarb;
     const { data } = await axios.get("/api/carburant", { params });
@@ -248,8 +252,8 @@ export default function CarburantPage() {
     fetchMonthData();
   }, [selectedMois, selectedAnnee, carGroup, typeCarb]); // eslint-disable-line
 
-  const refreshAll = async () => {
-    await Promise.all([fetchMonthData(), fetchFiltres()]);
+  const refreshAll = async (overrideMois?: number, overrideAnnee?: number) => {
+    await Promise.all([fetchMonthData(overrideMois, overrideAnnee), fetchFiltres()]);
   };
 
   // ── Filtrage local + pagination ───────────────────────────────────────────
@@ -304,7 +308,8 @@ export default function CarburantPage() {
       setSelectedMois(moisImporte);
       setSelectedAnnee(anneeImportee);
       setPage(1);
-      await refreshAll();
+      // Passe les valeurs explicitement pour éviter la closure stale
+      await refreshAll(moisImporte, anneeImportee);
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Erreur lors de l'import");
     } finally {
@@ -496,14 +501,16 @@ export default function CarburantPage() {
               <thead className="sticky top-0 z-10 bg-camublue-900 text-white text-[11px] uppercase tracking-wide">
                 <tr>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Matricule</th>
-                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Conducteur</th>
+                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Conducteur(s)</th>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">BL</th>
-                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Litres</th>
+                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Litres consommés</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Montant TTC</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Montant HT</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Dist. déclarée</th>
                   <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Dist. GPS</th>
-                  <th className="px-3 py-3 text-center font-semibold whitespace-nowrap">Fuel</th>
+                  <th className="px-3 py-3 text-right font-semibold whitespace-nowrap">Conso/100</th>
+                  <th className="px-3 py-3 text-center font-semibold whitespace-nowrap">Fuel type</th>
+                  <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Vehicle Type</th>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Car Group</th>
                   <th className="px-3 py-3 text-left font-semibold whitespace-nowrap">Label</th>
                 </tr>
@@ -511,7 +518,7 @@ export default function CarburantPage() {
               <tbody>
                 {displayRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-16 text-center text-gray-400">
+                    <td colSpan={13} className="py-16 text-center text-gray-400">
                       Aucune donnée pour {MOIS_NOMS[selectedMois - 1]} {selectedAnnee}. Importez un fichier Excel.
                     </td>
                   </tr>
@@ -527,7 +534,7 @@ export default function CarburantPage() {
                     <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{r.code_projet ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900"
                       onClick={() => openQuickEdit(r, "quantite_totale")}>
-                      {fmt(r.quantite_totale, 1)}
+                      {fmt(r.quantite_totale, 2)}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900"
                       onClick={() => openQuickEdit(r, "montant_total")}>
@@ -545,9 +552,13 @@ export default function CarburantPage() {
                       onClick={() => openQuickEdit(r, "distance_gps")}>
                       {fmt(r.distance_gps)}
                     </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-gray-500 text-xs">
+                      {r.conso_100 != null ? fmt(r.conso_100, 2) : "—"}
+                    </td>
                     <td className="px-3 py-2.5 text-center">
                       <TypeBadge type={r.type_carburant} />
                     </td>
+                    <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{r.vehicle_type ?? "—"}</td>
                     <td className="px-3 py-2.5 text-xs text-gray-600 max-w-[180px] truncate"
                       title={r.car_group ?? undefined}>
                       {r.car_group ?? "—"}
