@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getCached, TTL_LONG } from "@/lib/apiCache";
 import { Plus, X, Download, Filter, Settings, Pencil, Trash2, FileText, Search, ListOrdered, Building2, ClipboardList, BarChart2 } from "lucide-react";
 import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
@@ -74,7 +75,7 @@ export default function SuiviDevisPage() {
   };
 
   useEffect(() => { load(); }, [page, filters, pageSize]);
-  useEffect(() => { suiviDevisService.filtres().then(setFiltres).catch(() => {}); }, []);
+  useEffect(() => { getCached("devis:filtres", () => suiviDevisService.filtres(), TTL_LONG).then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { setPage(1); }, [filters]);
 
   const hasFilters = Object.keys(filters).length > 0;

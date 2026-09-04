@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getCached, TTL_LONG } from "@/lib/apiCache";
 import { Plus, X, Download, Filter, Settings, Pencil, Trash2, Search, ListOrdered, Gauge, CircleDot, BarChart2 } from "lucide-react";
 import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, Cell } from "recharts";
@@ -118,7 +119,7 @@ export default function PneumatiquePage() {
   }, [chartFilter]);
 
   useEffect(() => { load(); }, [page, filters, pageSize]);
-  useEffect(() => { pneumatiqueService.filtres().then(setFiltres).catch(() => {}); }, []);
+  useEffect(() => { getCached("pneumatiques:filtres", () => pneumatiqueService.filtres(), TTL_LONG).then(setFiltres).catch(() => {}); }, []);
   useEffect(() => { setPage(1); }, [filters]);
 
   const hasFilters = Object.keys(filters).length > 0;

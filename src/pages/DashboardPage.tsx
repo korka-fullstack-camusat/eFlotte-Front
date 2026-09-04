@@ -1,14 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { CheckCircle, Wallet, Fuel, BarChart2, Filter, X, Car, Wrench, Route, DollarSign, Droplets, RefreshCw } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
-  Tooltip as RTooltip, Cell,
-} from "recharts";
 import AppLayout from "@/components/layout/AppLayout";
 import { vehiculeService, coutService } from "@/services/api";
 import axios from "axios";
-import type { Vehicule, KpiCouts, EvolutionPoint, VehiculeCoutPoint, FiltresCouts, CoutsFilters } from "@/types";
-import { KpiCard, MiniLineChart, MiniBarChart, DonutChart } from "@/components/charts";
+import { getCached, TTL_LONG, TTL_SHORT } from "@/lib/apiCache";
+import type { Vehicule, KpiCouts, EvolutionPoint, VehiculeCoutPoint, FiltresCouts, CoutsFilters } from "@/types"; // VehiculeCoutPoint used for state types
+import { KpiCard, DonutChart } from "@/components/charts";
 
 interface VehiculeStats {
   total: number; en_service: number; en_maintenance: number;
@@ -52,28 +49,6 @@ function aggregateCount<T>(items: T[], getKey: (item: T) => string | null | unde
     .map(([label, value]) => ({ label, value }));
 }
 
-const RANK_COLORS = ["#1e3a5f","#10b981","#f59e0b","#f43f5e","#8b5cf6","#06b6d4","#84cc16","#ec4899","#6366f1","#f97316"];
-
-function TopBarChart({ items, unit, color }: { items: VehiculeCoutPoint[]; unit?: string; color?: string }) {
-  if (items.length === 0) return <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>;
-  const data = items.map(it => ({ name: it.plaque_immatriculation, value: it.total }));
-  const fmt = (v: number) => unit === "km" ? `${v.toLocaleString("fr-FR")} km` : `${v.toLocaleString("fr-FR")} FCFA`;
-  const fmtTick = (v: number) => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v/1_000).toFixed(0)}k` : String(v);
-  return (
-    <ResponsiveContainer width="100%" height={Math.max(200, items.length * 34)}>
-      <BarChart data={data} layout="vertical" margin={{ left: 4, right: 60, top: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-        <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={fmtTick} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
-        <RTooltip formatter={(v: number) => [fmt(v), ""]} />
-        <Bar dataKey="value" radius={[0, 4, 4, 0]}
-          label={{ position: "right", fontSize: 10, fill: "#6b7280", formatter: fmtTick }}>
-          {data.map((_, i) => <Cell key={i} fill={color ?? RANK_COLORS[i % RANK_COLORS.length]} />)}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -105,13 +80,21 @@ export default function DashboardPage() {
   const [draft,              setDraft]              = useState<CoutsFilters>({ annee: THIS_YEAR });
   const [loading,            setLoading]            = useState(false);
 
-  // Données statiques (flotte + filtres disponibles)
+  // Données statiques (flotte + filtres disponibles) — cachées 5 min, chargement parallèle
   useEffect(() => {
-    vehiculeService.getAll().then(setVehicules).catch(() => {});
-    axios.get("/api/vehicules/stats").then(r => setVehiculeStats(r.data)).catch(() => {});
-    coutService.filtres().then(setFiltres).catch(() => {});
-    axios.get("/api/suivi-devis/stats").then(r => setDevisStats(r.data)).catch(() => {});
-    axios.get("/api/sinistres/stats").then(r => setSinistresStats(r.data)).catch(() => {});
+    Promise.all([
+      getCached("vehicules:all",      () => vehiculeService.getAll(),                           TTL_LONG),
+      getCached("vehicules:stats",    () => axios.get("/api/vehicules/stats").then(r => r.data), TTL_LONG),
+      getCached("couts:filtres",      () => coutService.filtres(),                               TTL_LONG),
+      getCached("devis:stats",        () => axios.get("/api/suivi-devis/stats").then(r => r.data), TTL_LONG),
+      getCached("sinistres:stats",    () => axios.get("/api/sinistres/stats").then(r => r.data),  TTL_LONG),
+    ]).then(([veh, vstats, filtresData, devis, sinistres]) => {
+      setVehicules(veh as typeof vehicules);
+      setVehiculeStats(vstats as VehiculeStats);
+      setFiltres(filtresData as FiltresCouts);
+      setDevisStats(devis as DevisStats);
+      setSinistresStats(sinistres as SinistresStats);
+    }).catch(() => {});
   }, []);
 
   // Données filtrées — toutes les courbes et KPIs
@@ -121,20 +104,39 @@ export default function DashboardPage() {
     // Si aucun filtre annee/mois, défaut = année courante
     if (!p.annee && !p.mois) p.annee = THIS_YEAR;
 
+    // Params carburant : extraire mois/annee depuis le format "YYYY-MM"
     const carParams: Record<string, any> = {};
-    if (p.mois) carParams.mois = p.mois;
-    else if (p.annee) carParams.annee = p.annee;
+    if (p.mois) {
+      const [ay, am] = String(p.mois).split("-");
+      carParams.annee = Number(ay);
+      carParams.mois  = Number(am);
+    } else if (p.annee) {
+      carParams.annee = p.annee;
+    }
 
+    // Pour l'évolution, on ne restreint pas à l'année par défaut — on veut tous les mois disponibles
+    const evoP: CoutsFilters = { ...filters };
+
+    const fKey = JSON.stringify({ ...p, ...carParams });
     Promise.all([
-      coutService.kpi(p).then(setKpi).catch(() => {}),
-      coutService.evolution({ ...p, type_cout: "CARBURANT" }).then(setEvolutionCarburant).catch(() => {}),
-      coutService.evolution({ ...p, type_cout: "ENT" }).then(setEvolutionMaint).catch(() => {}),
-      coutService.evolution({ ...p, type_cout: "REP" }).then(setEvolutionRep).catch(() => {}),
-      coutService.topCarburant({ annee: p.annee, mois: p.mois as any, plaque: p.plaque, type_vehicule: p.type_vehicule, fournisseur: p.fournisseur, type_location: p.type_location, limit: 10 }).then(setTopCarburant).catch(() => {}),
-      coutService.parVehicule({ ...p, type_cout: "DISTANCE", limit: 10 }).then(setTopKm).catch(() => {}),
-      coutService.parVehicule({ ...p, type_cout: "REP",      limit: 10 }).then(setTopReparation).catch(() => {}),
-      axios.get("/api/carburant/stats", { params: carParams }).then(r => setCarburantStats(r.data)).catch(() => {}),
-    ]).finally(() => setLoading(false));
+      getCached(`kpi:${fKey}`,        () => coutService.kpi(p),                                                   TTL_SHORT),
+      getCached(`evo:car:${fKey}`,    () => coutService.evolution({ ...evoP, type_cout: "CARBURANT" }),            TTL_SHORT),
+      getCached(`evo:ent:${fKey}`,    () => coutService.evolution({ ...evoP, type_cout: "ENT" }),                  TTL_SHORT),
+      getCached(`evo:rep:${fKey}`,    () => coutService.evolution({ ...evoP, type_cout: "REP" }),                  TTL_SHORT),
+      getCached(`topcar:${fKey}`,     () => coutService.topCarburant({ annee: p.annee, mois: p.mois as any, plaque: p.plaque, type_vehicule: p.type_vehicule, fournisseur: p.fournisseur, type_location: p.type_location, limit: 10 }), TTL_SHORT),
+      getCached(`topkm:${fKey}`,      () => coutService.parVehicule({ ...p, type_cout: "DISTANCE", limit: 10 }),   TTL_SHORT),
+      getCached(`toprep:${fKey}`,     () => coutService.parVehicule({ ...p, type_cout: "REP",      limit: 10 }),   TTL_SHORT),
+      getCached(`carbstats:${fKey}`,  () => axios.get("/api/carburant/stats", { params: carParams }).then(r => r.data), TTL_SHORT),
+    ]).then(([kpiData, evoCar, evoEnt, evoRep, topCar, topKmData, topRep, carbStats]) => {
+      setKpi(kpiData as KpiCouts);
+      setEvolutionCarburant(evoCar as EvolutionPoint[]);
+      setEvolutionMaint(evoEnt as EvolutionPoint[]);
+      setEvolutionRep(evoRep as EvolutionPoint[]);
+      setTopCarburant(topCar as VehiculeCoutPoint[]);
+      setTopKm(topKmData as VehiculeCoutPoint[]);
+      setTopReparation(topRep as VehiculeCoutPoint[]);
+      setCarburantStats(carbStats as CarburantStats);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [filters]);
 
   // Dérivés flotte
@@ -227,142 +229,188 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── KPI Flotte ─────────────────────────────────────────────────── */}
+      {/* ── Flotte : KPIs gauche + statut donut droite ─────────────────── */}
       <SectionTitle>Flotte — État des véhicules</SectionTitle>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-        <KpiCard label="Total véhicules"    value={totalVehicules}     icon={<Car size={20}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="En service"         value={enServiceCount}     icon={<CheckCircle size={20}/>} bg="bg-emerald-100"     text="text-emerald-600" />
-        <KpiCard label="En maintenance"     value={enMaintenanceCount} icon={<Wrench size={20}/>}      bg="bg-amber-100"       text="text-amber-600" />
-        <KpiCard label="Taux disponibilité" value={tauxDisponibilite}  suffix="%" icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" valueColor="text-amber-600" />
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
+          <div className="grid grid-cols-2 gap-3 flex-1">
+            <KpiCard label="Total véhicules"    value={totalVehicules}     icon={<Car size={18}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
+            <KpiCard label="En service"         value={enServiceCount}     icon={<CheckCircle size={18}/>} bg="bg-emerald-100"     text="text-emerald-600" />
+            <KpiCard label="En maintenance"     value={enMaintenanceCount} icon={<Wrench size={18}/>}      bg="bg-amber-100"       text="text-amber-600" />
+            <KpiCard label="Taux disponibilité" value={tauxDisponibilite}  suffix="%" icon={<BarChart2 size={18}/>} bg="bg-camublue-900/10" text="text-camublue-900" valueColor="text-amber-600" />
+          </div>
+          <div className="lg:w-96 w-full shrink-0">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Répartition par statut</p>
+            {repartitionStatut.every(r => r.value === 0)
+              ? <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
+              : <DonutChart data={repartitionStatut} colors={["#10b981","#f59e0b","#f43f5e","#9ca3af"]} />}
+          </div>
+        </div>
       </div>
 
-      {/* ── KPI Coûts filtrés ───────────────────────────────────────────── */}
+      {/* ── Coûts : KPIs gauche + répartition donut droite ─────────────── */}
       <SectionTitle>Coûts — {periodeLabel}</SectionTitle>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-        <KpiCard label="Valeur flotte (FCFA)"   value={kpi?.cout_total      ?? 0} icon={<Wallet size={20}/>}  bg="bg-emerald-100"     text="text-emerald-600" valueColor="text-amber-600" />
-        <KpiCard label="Coût carburant (FCFA)"  value={kpi?.cout_carburant  ?? 0} icon={<Fuel size={20}/>}    bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="Coût entretien (FCFA)"  value={coutMaintenanceTotal}      icon={<Wrench size={20}/>}  bg="bg-amber-100"       text="text-amber-600" valueColor="text-amber-600" />
-        <KpiCard label="Coût réparation (FCFA)" value={coutReparationTotal}       icon={<Wrench size={20}/>}  bg="bg-rose-100"        text="text-rose-600"  valueColor="text-rose-600" />
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
+          <div className="grid grid-cols-2 gap-3 flex-1">
+            <KpiCard label="Valeur flotte (FCFA)"   value={kpi?.cout_total      ?? 0} icon={<Wallet size={18}/>}  bg="bg-emerald-100"     text="text-emerald-600" valueColor="text-amber-600" />
+            <KpiCard label="Coût carburant (FCFA)"  value={kpi?.cout_carburant  ?? 0} icon={<Fuel size={18}/>}    bg="bg-camublue-900/10" text="text-camublue-900" />
+            <KpiCard label="Coût entretien (FCFA)"  value={coutMaintenanceTotal}      icon={<Wrench size={18}/>}  bg="bg-amber-100"       text="text-amber-600" valueColor="text-amber-600" />
+            <KpiCard label="Coût réparation (FCFA)" value={coutReparationTotal}       icon={<Wrench size={18}/>}  bg="bg-rose-100"        text="text-rose-600"  valueColor="text-rose-600" />
+          </div>
+          <div className="lg:w-96 w-full shrink-0">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Répartition des coûts</p>
+            {(kpi?.cout_carburant ?? 0) + coutMaintenanceTotal + coutReparationTotal === 0
+              ? <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
+              : <DonutChart
+                  data={[
+                    { label: "Carburant",  value: kpi?.cout_carburant  ?? 0 },
+                    { label: "Entretien",  value: coutMaintenanceTotal },
+                    { label: "Réparation", value: coutReparationTotal },
+                  ].filter(d => d.value > 0)}
+                  colors={["#1e3a5f","#f59e0b","#f43f5e"]}
+                />}
+          </div>
+        </div>
       </div>
 
-      {/* ── Suivi Devis KPIs ───────────────────────────────────────────── */}
+      {/* ── Suivi Devis : KPIs gauche + PO fournisseur donut droite ────── */}
       {devisStats && (
         <div className="mb-5">
           <SectionTitle>Suivi des devis — Global</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <KpiCard label="Coût total devis (FCFA)"     value={devisStats.cout_total}      icon={<Wallet size={20}/>}  bg="bg-camublue-900/10" text="text-camublue-900" />
-            <KpiCard label="Coût total entretien (FCFA)" value={devisStats.cout_entretien}  icon={<Wrench size={20}/>}  bg="bg-amber-100"       text="text-amber-600" />
-            <KpiCard label="Coût total réparation (FCFA)"value={devisStats.cout_reparation} icon={<Wrench size={20}/>}  bg="bg-rose-100"        text="text-rose-600" />
-            <KpiCard label="Nombre de devis"             value={devisStats.nb_total}        icon={<BarChart2 size={20}/>} bg="bg-emerald-100"   text="text-emerald-600" />
-          </div>
-          {devisStats.po_par_fournisseur.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-camublue-900 mb-4">Répartition nombre de PO par fournisseur</h3>
-              <ResponsiveContainer width="100%" height={Math.max(200, devisStats.po_par_fournisseur.length * 36)}>
-                <BarChart data={devisStats.po_par_fournisseur} layout="vertical" margin={{ left: 4, right: 50, top: 4, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="fournisseur" tick={{ fontSize: 10 }} width={110} />
-                  <RTooltip formatter={(v: number) => [`${v} PO`, ""]} />
-                  <Bar dataKey="nb_po" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 10, fill: "#6b7280" }}>
-                    {devisStats.po_par_fournisseur.map((_, i) => <Cell key={i} fill={RANK_COLORS[i % RANK_COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex flex-col lg:flex-row gap-5 items-start">
+              <div className="grid grid-cols-2 gap-3 flex-1">
+                <KpiCard label="Coût total devis (FCFA)"     value={devisStats.cout_total}      icon={<Wallet size={18}/>}    bg="bg-camublue-900/10" text="text-camublue-900" />
+                <KpiCard label="Coût total entretien (FCFA)" value={devisStats.cout_entretien}  icon={<Wrench size={18}/>}    bg="bg-amber-100"       text="text-amber-600" />
+                <KpiCard label="Coût total réparation (FCFA)"value={devisStats.cout_reparation} icon={<Wrench size={18}/>}    bg="bg-rose-100"        text="text-rose-600" />
+                <KpiCard label="Nombre de devis"             value={devisStats.nb_total}        icon={<BarChart2 size={18}/>} bg="bg-emerald-100"     text="text-emerald-600" />
+              </div>
+              <div className="lg:w-96 w-full shrink-0">
+                <p className="text-xs font-semibold text-gray-500 mb-2">PO par fournisseur</p>
+                {devisStats.po_par_fournisseur.length === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
+                  : <DonutChart data={devisStats.po_par_fournisseur.map(f => ({ label: f.fournisseur, value: f.nb_po }))} />}
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 
-      {/* ── Sinistres circonstances ────────────────────────────────────── */}
+      {/* ── Sinistres : KPIs gauche + circonstances donut droite ────────── */}
       {sinistresStats && (
         <div className="mb-5">
           <SectionTitle>Suivi des sinistres — Circonstances</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <KpiCard label="Total sinistres"  value={sinistresStats.total}       icon={<BarChart2 size={20}/>} bg="bg-camublue-900/10" text="text-camublue-900" />
-            <KpiCard label="Accidents"        value={sinistresStats.nb_accident} icon={<Car size={20}/>}       bg="bg-rose-100"        text="text-rose-600" />
-            <KpiCard label="Incidents"        value={sinistresStats.nb_incident} icon={<Car size={20}/>}       bg="bg-amber-100"       text="text-amber-600" />
-            <KpiCard label="Autres"           value={sinistresStats.nb_autre}    icon={<BarChart2 size={20}/>} bg="bg-gray-100"        text="text-gray-600" />
-          </div>
-          {sinistresStats.circonstances.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-camublue-900 mb-4">Répartition ACCIDENT / INCIDENT</h3>
-              <DonutChart data={sinistresStats.circonstances} colors={["#f43f5e","#f59e0b","#9ca3af","#6366f1","#10b981"]} />
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex flex-col lg:flex-row gap-5 items-start">
+              <div className="grid grid-cols-2 gap-3 flex-1">
+                <KpiCard label="Total sinistres" value={sinistresStats.total}       icon={<BarChart2 size={18}/>} bg="bg-camublue-900/10" text="text-camublue-900" />
+                <KpiCard label="Accidents"       value={sinistresStats.nb_accident} icon={<Car size={18}/>}       bg="bg-rose-100"        text="text-rose-600" />
+                <KpiCard label="Incidents"       value={sinistresStats.nb_incident} icon={<Car size={18}/>}       bg="bg-amber-100"       text="text-amber-600" />
+                <KpiCard label="Autres"          value={sinistresStats.nb_autre}    icon={<BarChart2 size={18}/>} bg="bg-gray-100"        text="text-gray-600" />
+              </div>
+              <div className="lg:w-96 w-full shrink-0">
+                <p className="text-xs font-semibold text-gray-500 mb-2">Répartition ACCIDENT / INCIDENT</p>
+                {sinistresStats.circonstances.length === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
+                  : <DonutChart data={sinistresStats.circonstances} colors={["#f43f5e","#f59e0b","#9ca3af","#6366f1","#10b981"]} />}
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 
-      {/* ── KPI Carburant (filtré) ──────────────────────────────────────── */}
+      {/* ── Carburant : KPIs gauche + gazoil/essence donut droite ──────── */}
       {carburantStats && (
         <div className="mb-5">
           <SectionTitle>Carburant — {periodeLabel}</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <KpiCard label="Véhicules suivis"  value={carburantStats.total_vehicules} icon={<Car size={20}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
-            <KpiCard label="Total litres"       value={Math.round(carburantStats.total_litres)}  suffix=" L" icon={<Droplets size={20}/>} bg="bg-blue-50"     text="text-blue-700" />
-            <KpiCard label="Coût total (FCFA)"  value={Math.round(carburantStats.total_montant)} icon={<DollarSign size={20}/>}  bg="bg-green-50"    text="text-green-700" />
-            <KpiCard label="Distance totale"    value={Math.round(carburantStats.total_distance)} suffix=" km" icon={<Route size={20}/>}   bg="bg-amber-50"    text="text-amber-700" />
-            <KpiCard label="Gazoil (L)"         value={Math.round(carburantStats.litres_gazoil)} icon={<Fuel size={20}/>}        bg="bg-camublue-900/10" text="text-camublue-900" />
-            <KpiCard label="Essence (L)"        value={Math.round(carburantStats.litres_essence)} icon={<Fuel size={20}/>}       bg="bg-orange-50"   text="text-orange-600" />
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex flex-col lg:flex-row gap-5 items-start">
+              <div className="grid grid-cols-2 gap-3 flex-1">
+                <KpiCard label="Véhicules suivis"  value={carburantStats.total_vehicules}              icon={<Car size={18}/>}        bg="bg-camublue-900/10" text="text-camublue-900" />
+                <KpiCard label="Total litres"      value={Math.round(carburantStats.total_litres)}   suffix=" L" icon={<Droplets size={18}/>}   bg="bg-blue-50"         text="text-blue-700" />
+                <KpiCard label="Coût total (FCFA)" value={Math.round(carburantStats.total_montant)}             icon={<DollarSign size={18}/>} bg="bg-green-50"        text="text-green-700" />
+                <KpiCard label="Distance totale"   value={Math.round(carburantStats.total_distance)} suffix=" km" icon={<Route size={18}/>}    bg="bg-amber-50"        text="text-amber-700" />
+                <KpiCard label="Gazoil (L)"        value={Math.round(carburantStats.litres_gazoil)}             icon={<Fuel size={18}/>}       bg="bg-camublue-900/10" text="text-camublue-900" />
+                <KpiCard label="Essence (L)"       value={Math.round(carburantStats.litres_essence)}            icon={<Fuel size={18}/>}       bg="bg-orange-50"       text="text-orange-600" />
+              </div>
+              <div className="lg:w-96 w-full shrink-0">
+                <p className="text-xs font-semibold text-gray-500 mb-2">Gazoil vs Essence (litres)</p>
+                {carburantStats.litres_gazoil + carburantStats.litres_essence === 0
+                  ? <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
+                  : <DonutChart
+                      data={[
+                        { label: "Gazoil",  value: Math.round(carburantStats.litres_gazoil) },
+                        { label: "Essence", value: Math.round(carburantStats.litres_essence) },
+                      ].filter(d => d.value > 0)}
+                      colors={["#1e3a5f","#f97316"]}
+                    />}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Répartitions flotte ─────────────────────────────────────────── */}
+      {/* ── Évolution des coûts par mois ────────────────────────────────── */}
+      <SectionTitle>Évolution des coûts — Tous les mois disponibles</SectionTitle>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-bold text-camublue-900 mb-4">Répartition par statut</h3>
-          {repartitionStatut.every(r => r.value === 0)
-            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée — renseignez le statut des véhicules.</p>
-            : <DonutChart data={repartitionStatut} colors={["#10b981","#f59e0b","#f43f5e","#9ca3af"]} />}
+          <h3 className="text-sm font-bold text-camublue-900 mb-3">Carburant par mois (FCFA)</h3>
+          {evolutionCarburant.filter(p => p.total > 0).length === 0
+            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée.</p>
+            : <DonutChart
+                data={evolutionCarburant.filter(p => p.total > 0).map(p => ({
+                  label: `${MOIS_NOMS[p.mois - 1]}${p.annee ? ` ${p.annee}` : ""}`,
+                  value: p.total,
+                }))}
+                colors={["#1e3a5f","#10b981","#f59e0b","#f43f5e","#8b5cf6","#06b6d4","#84cc16","#ec4899","#6366f1","#f97316","#14b8a6","#a855f7"]}
+              />}
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-bold text-camublue-900 mb-4">Répartition par type de véhicule</h3>
-          {repartitionType.length === 0
+          <h3 className="text-sm font-bold text-camublue-900 mb-3">Maintenance par mois (FCFA)</h3>
+          {evolutionMaint.filter(p => p.total > 0).length === 0
+            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée.</p>
+            : <DonutChart
+                data={evolutionMaint.filter(p => p.total > 0).map(p => ({
+                  label: `${MOIS_NOMS[p.mois - 1]}${p.annee ? ` ${p.annee}` : ""}`,
+                  value: p.total,
+                }))}
+                colors={["#f59e0b","#f43f5e","#8b5cf6","#10b981","#1e3a5f","#06b6d4","#84cc16","#ec4899","#6366f1","#f97316","#14b8a6","#a855f7"]}
+              />}
+        </div>
+      </div>
+
+      {/* ── Top 10 — donuts ─────────────────────────────────────────────── */}
+      <SectionTitle>Top 10 — {periodeLabel}</SectionTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-sm font-bold text-camublue-900 mb-4">Consommation carburant (FCFA)</h3>
+          {topCarburant.length === 0
             ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>
-            : <DonutChart data={repartitionType} />}
-        </div>
-      </div>
-
-      {/* ── Évolutions coûts ────────────────────────────────────────────── */}
-      <SectionTitle>Évolution des coûts — {periodeLabel}</SectionTitle>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-bold text-camublue-900 mb-3">Consommation carburant (FCFA)</h3>
-          {evolutionCarburant.length === 0
-            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée pour cette période.</p>
-            : <MiniBarChart points={evolutionCarburant} color="#1e3a5f" />}
+            : <DonutChart
+                showValues
+                data={topCarburant.map(it => ({ label: it.plaque_immatriculation, value: it.total }))}
+              />}
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-bold text-camublue-900 mb-3">Coût maintenance (FCFA)</h3>
-          {evolutionMaint.length === 0
-            ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée pour cette période.</p>
-            : <MiniLineChart points={evolutionMaint} />}
-        </div>
-      </div>
-
-      {/* ── Top 10 carburant ────────────────────────────────────────────── */}
-      <SectionTitle>Top 10 Consommation Carburant — {periodeLabel}</SectionTitle>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
-        {topCarburant.length === 0
-          ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée pour cette période.</p>
-          : <TopBarChart items={topCarburant} />}
-      </div>
-
-      {/* ── Top 10 km & réparation ──────────────────────────────────────── */}
-      <SectionTitle>Top 10 Performance — {periodeLabel}</SectionTitle>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-bold text-camublue-900 mb-4">Véhicules les plus kilométrés</h3>
+          <h3 className="text-sm font-bold text-camublue-900 mb-4">Kilométrage (km)</h3>
           {topKm.length === 0
             ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>
-            : <TopBarChart items={topKm} unit="km" />}
+            : <DonutChart
+                showValues unit="km"
+                data={topKm.map(it => ({ label: it.plaque_immatriculation, value: it.total }))}
+                colors={["#10b981","#1e3a5f","#f59e0b","#8b5cf6","#06b6d4","#84cc16","#ec4899","#f43f5e","#6366f1","#f97316"]}
+              />}
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="text-sm font-bold text-camublue-900 mb-4">Coûts de réparation (FCFA)</h3>
           {topReparation.length === 0
             ? <p className="text-sm text-gray-400 text-center py-10">Aucune donnée</p>
-            : <TopBarChart items={topReparation} />}
+            : <DonutChart
+                showValues
+                data={topReparation.map(it => ({ label: it.plaque_immatriculation, value: it.total }))}
+                colors={["#f43f5e","#f59e0b","#8b5cf6","#1e3a5f","#10b981","#06b6d4","#84cc16","#ec4899","#6366f1","#f97316"]}
+              />}
         </div>
       </div>
 

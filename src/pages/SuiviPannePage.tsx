@@ -1,5 +1,7 @@
 // Suivi des Pannes — feuille SUIVI DES PANNE
 import { useEffect, useState, useCallback } from "react";
+import TableSkeleton from "@/components/TableSkeleton";
+import { getCached, TTL_LONG } from "@/lib/apiCache";
 import ExportModal, { ExportColDef } from "@/components/ExportModal";
 import {
   Plus, Pencil, Trash2, X, Download, Search, Filter,
@@ -113,7 +115,8 @@ export default function SuiviPannePage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    suiviPanneService.filtres().then(setFiltres).catch(() => {});
+    getCached("pannes:filtres", () => suiviPanneService.filtres(), TTL_LONG)
+      .then(setFiltres).catch(() => {});
   }, []);
   useEffect(() => { setPage(1); }, [filters, search]);
 
@@ -315,7 +318,18 @@ export default function SuiviPannePage() {
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
-          <p className="text-sm text-gray-400 p-6 text-center">Chargement…</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-camublue-900 text-white text-xs uppercase sticky top-0 z-10">
+                <tr>
+                  {["Date","Plaque","Chauffeur","Garage","Nature","Indisp.","Projet","Fin répar.","Site","Jrs","Statut"].map(h => (
+                    <th key={h} className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody><TableSkeleton rows={10} cols={11} /></tbody>
+            </table>
+          </div>
         ) : items.length === 0 ? (
           <p className="text-sm text-gray-400 p-6 text-center">Aucune panne trouvée.</p>
         ) : (

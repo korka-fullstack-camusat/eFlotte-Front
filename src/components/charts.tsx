@@ -2,15 +2,15 @@ export function KpiCard({ label, value, icon, bg, text, suffix, valueColor }: {
   label: string; value: number; icon: React.ReactNode; bg: string; text: string; suffix?: string; valueColor?: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-5 flex flex-col items-center text-center gap-2">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-3 flex flex-col items-center text-center gap-1.5">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
         <span className={text}>{icon}</span>
       </div>
       <div>
-        <p className={`text-2xl font-black ${valueColor ?? "text-gray-800"}`}>
-          {value.toLocaleString("fr-FR")}{suffix ? <span className="text-sm font-semibold text-gray-400 ml-1">{suffix}</span> : null}
+        <p className={`text-lg font-bold ${valueColor ?? "text-gray-800"}`}>
+          {value.toLocaleString("fr-FR")}{suffix ? <span className="text-xs font-semibold text-gray-400 ml-1">{suffix}</span> : null}
         </p>
-        <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+        <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">{label}</p>
       </div>
     </div>
   );
@@ -33,10 +33,10 @@ export function BarRow({ label, value, max, color, unit }: { label: string; valu
 
 export const DONUT_COLORS = ["#1e3a5f", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6", "#06b6d4", "#84cc16", "#ec4899"];
 
-export function DonutChart({ data, colors = DONUT_COLORS }: { data: { label: string; value: number }[]; colors?: string[] }) {
+export function DonutChart({ data, colors = DONUT_COLORS, showValues = false, unit }: { data: { label: string; value: number }[]; colors?: string[]; showValues?: boolean; unit?: string }) {
   const total = data.reduce((s, d) => s + d.value, 0);
-  const size = 160;
-  const radius = 60;
+  const size = 200;
+  const radius = 76;
   const cx = size / 2;
   const cy = size / 2;
   let angle = -90;
@@ -61,7 +61,7 @@ export function DonutChart({ data, colors = DONUT_COLORS }: { data: { label: str
 
   return (
     <div className="flex flex-col sm:flex-row items-center gap-5">
-      <svg viewBox={`0 0 ${size} ${size}`} className="w-40 h-40 shrink-0">
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-48 h-48 shrink-0">
         {arcs.map((a, i) => (
           <path key={i} d={a.path} fill={a.color} stroke="white" strokeWidth={1} />
         ))}
@@ -75,7 +75,9 @@ export function DonutChart({ data, colors = DONUT_COLORS }: { data: { label: str
               <span className="text-gray-600 truncate">{d.label}</span>
             </div>
             <span className="font-semibold text-gray-700 whitespace-nowrap">
-              {total > 0 ? Math.round((d.value / total) * 100) : 0}%
+              {showValues
+                ? <>{d.value.toLocaleString("fr-FR")}{unit ? ` ${unit}` : ""} <span className="text-gray-400 font-normal">({total > 0 ? Math.round((d.value / total) * 100) : 0}%)</span></>
+                : `${total > 0 ? Math.round((d.value / total) * 100) : 0}%`}
             </span>
           </div>
         ))}
