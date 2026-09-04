@@ -44,31 +44,16 @@ function getStatut(p: SuiviPanne): string {
   return "EN_COURS";
 }
 
-function StatutBadge({ panne, onUpdate }: { panne: SuiviPanne; onUpdate: (s: string) => void }) {
-  const [open, setOpen] = useState(false);
+function StatutBadge({ panne, onClick }: { panne: SuiviPanne; onClick?: (e: React.MouseEvent) => void }) {
   const st = getStatut(panne);
   const opt = STATUT_OPTIONS.find(o => o.value === st) ?? STATUT_OPTIONS[0];
   return (
-    <div className="relative">
-      <button
-        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${opt.cls} hover:opacity-80 transition`}
-        title="Cliquer pour modifier le statut"
-      >
-        {opt.icon} {opt.label}
-      </button>
-      {open && (
-        <div className="absolute left-0 top-6 z-30 bg-white border border-gray-100 rounded-xl shadow-xl py-1 min-w-[140px]" onClick={e => e.stopPropagation()}>
-          {STATUT_OPTIONS.map(o => (
-            <button key={o.value}
-              onClick={() => { onUpdate(o.value); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold hover:bg-gray-50 transition text-left ${o.value === st ? "opacity-50 cursor-default" : ""}`}>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${o.cls}`}>{o.icon} {o.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${opt.cls} ${onClick ? "hover:opacity-80 cursor-pointer" : "cursor-default"} transition`}
+    >
+      {opt.icon} {opt.label}
+    </button>
   );
 }
 
@@ -107,6 +92,8 @@ export default function SuiviPannePage() {
   const [editing, setEditing] = useState<SuiviPanne | null>(null);
   const [form, setForm] = useState<Partial<SuiviPanne>>(EMPTY);
   const [manageRow, setManageRow] = useState<SuiviPanne | null>(null);
+  const [statutModal, setStatutModal] = useState<SuiviPanne | null>(null);
+  const [statutSaving, setStatutSaving] = useState(false);
 
 
   const [chartFilter, setChartFilter] = useState<ChartFilter>(CHART_FILTER_EMPTY);
@@ -184,13 +171,18 @@ export default function SuiviPannePage() {
     }
   };
 
-  const handleStatutUpdate = async (p: SuiviPanne, statut: string) => {
+  const handleStatutUpdate = async (statut: string) => {
+    if (!statutModal) return;
+    setStatutSaving(true);
     try {
-      await suiviPanneService.update(p.id, { statut } as any);
+      await suiviPanneService.update(statutModal.id, { statut } as any);
       toast.success("Statut mis à jour");
-      load();
+      setItems(prev => prev.map(i => i.id === statutModal.id ? { ...i, statut } as SuiviPanne : i));
+      setStatutModal(null);
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Erreur");
+    } finally {
+      setStatutSaving(false);
     }
   };
 
@@ -390,9 +382,10 @@ export default function SuiviPannePage() {
                       <span className={qSpan}>{p.immobilisation_jrs != null ? p.immobilisation_jrs : "—"}</span>
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
-                      {isViewer
-                        ? <StatutBadge panne={p} onUpdate={() => {}} />
-                        : <StatutBadge panne={p} onUpdate={s => handleStatutUpdate(p, s)} />}
+                      <StatutBadge
+                        panne={p}
+                        onClick={isViewer ? undefined : e => { e.stopPropagation(); setStatutModal(p); }}
+                      />
                     </td>
                   </tr>
                   );
@@ -531,7 +524,7 @@ export default function SuiviPannePage() {
                 <p><span className="font-semibold text-gray-700">Projet :</span> {manageRow.projet || "—"}</p>
                 <p><span className="font-semibold text-gray-700">Nature :</span> {manageRow.nature_panne || "—"}</p>
                 <p><span className="font-semibold text-gray-700">Immobilisation :</span> {manageRow.immobilisation_jrs != null ? `${manageRow.immobilisation_jrs} jrs` : "—"}</p>
-                <p><span className="font-semibold text-gray-700">Statut :</span> <StatutBadge panne={manageRow} onUpdate={() => {}} /></p>
+                <p><span className="font-semibold text-gray-700">Statut :</span> <StatutBadge panne={manageRow} /></p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -761,6 +754,56 @@ export default function SuiviPannePage() {
           </div>
         );
       })()}
+
+      {/* ══ Modal Statut ════════════════════════════════════════════════════ */}
+      {statutModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setStatutModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-camublue-900 px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-white font-bold text-sm">Modifier le statut</p>
+                <p className="text-white/60 text-xs mt-0.5">{statutModal.immatriculation} — {statutModal.nature_panne || "—"}</p>
+              </div>
+              <button onClick={() => setStatutModal(null)}
+                className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+                <X size={14} className="text-white" />
+              </button>
+            </div>
+            {/* Options */}
+            <div className="p-5 space-y-3">
+              {STATUT_OPTIONS.map(o => {
+                const current = getStatut(statutModal) === o.value;
+                return (
+                  <button key={o.value}
+                    onClick={() => !current && handleStatutUpdate(o.value)}
+                    disabled={statutSaving || current}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition text-left
+                      ${current
+                        ? "border-camublue-900 bg-camublue-900/5 cursor-default"
+                        : "border-gray-100 hover:border-camublue-900/30 hover:bg-gray-50 cursor-pointer"}
+                      ${statutSaving ? "opacity-60" : ""}`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${o.cls}`}>
+                      {o.icon} {o.label}
+                    </span>
+                    {current && (
+                      <span className="ml-auto text-[10px] font-semibold text-camublue-900 uppercase tracking-wide">Actuel</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="px-5 pb-5">
+              <button onClick={() => setStatutModal(null)}
+                className="w-full border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
