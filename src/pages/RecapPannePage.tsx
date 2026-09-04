@@ -506,36 +506,22 @@ export default function RecapPannePage() {
         </div>
       </div>
 
-      {/* ── KPIs-filtres ── */}
+      {/* ── KPIs cliquables ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {([
-          { key: "",             label: "Total véhicules", value: kpiTotal,       icon: <Car size={22}/>,         ring: "ring-camublue-900",  bg: "bg-camublue-900/10",  text: "text-camublue-900",  activeBg: "bg-camublue-900",  activeText: "text-white" },
-          { key: "service",      label: "En service",      value: kpiEnService,   icon: <CheckCircle size={22}/>, ring: "ring-emerald-500",   bg: "bg-emerald-50",       text: "text-emerald-700",   activeBg: "bg-emerald-600",   activeText: "text-white" },
-          { key: "maintenance",  label: "En maintenance",  value: kpiMaintenance, icon: <Wrench size={22}/>,      ring: "ring-amber-500",    bg: "bg-amber-50",         text: "text-amber-700",     activeBg: "bg-amber-500",     activeText: "text-white" },
-          { key: "immobilise",   label: "Immobilisés",     value: kpiImmobilises, icon: <Ban size={22}/>,         ring: "ring-rose-500",     bg: "bg-rose-50",          text: "text-rose-700",      activeBg: "bg-rose-600",      activeText: "text-white" },
-        ] as const).map(k => {
-          const isActive = kpiFilter === k.key;
-          return (
-            <button
-              key={k.key}
-              onClick={() => setKpiFilter(isActive ? "" : k.key)}
-              className={`flex items-center gap-4 px-5 py-4 rounded-2xl border-2 transition w-full text-left shadow-sm
-                ${isActive
-                  ? `${k.activeBg} ${k.activeText} border-transparent shadow-md`
-                  : `${k.bg} ${k.text} border-transparent hover:ring-2 ${k.ring}/40`
-                }`}
-            >
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isActive ? "bg-white/20" : k.bg}`}>
-                {k.icon}
-              </div>
-              <div className="min-w-0">
-                <p className="text-3xl font-bold leading-none">{k.value}</p>
-                <p className={`text-xs font-semibold mt-1 ${isActive ? "opacity-90" : "opacity-70"}`}>{k.label}</p>
-              </div>
-              {isActive && <span className="ml-auto text-xs font-bold opacity-70">✕ filtre actif</span>}
-            </button>
-          );
-        })}
+          { key: "",            label: "Total véhicules", value: kpiTotal,       icon: <Car size={20}/>,         bg: "bg-camublue-900/10", text: "text-camublue-900" },
+          { key: "service",     label: "En service",      value: kpiEnService,   icon: <CheckCircle size={20}/>, bg: "bg-emerald-100",     text: "text-emerald-600" },
+          { key: "maintenance", label: "En maintenance",  value: kpiMaintenance, icon: <Wrench size={20}/>,      bg: "bg-amber-100",       text: "text-amber-600" },
+          { key: "immobilise",  label: "Immobilisés",     value: kpiImmobilises, icon: <Ban size={20}/>,         bg: "bg-rose-100",        text: "text-rose-600" },
+        ] as const).map(k => (
+          <button
+            key={k.key}
+            onClick={() => setKpiFilter(kpiFilter === k.key ? "" : k.key)}
+            className={`text-left w-full rounded-2xl transition ring-2 ${kpiFilter === k.key ? "ring-camublue-900 shadow-md" : "ring-transparent hover:ring-gray-200"}`}
+          >
+            <KpiCard label={k.label} value={k.value} icon={k.icon} bg={k.bg} text={k.text} />
+          </button>
+        ))}
       </div>
 
       {/* ── Recherche centrée ── */}
