@@ -159,9 +159,21 @@ const THIS_YEAR = new Date().getFullYear();
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
+function loadPersistedPeriod(): { mois: number; annee: number } {
+  try {
+    const raw = localStorage.getItem("carburant_period");
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p.mois >= 1 && p.mois <= 12 && p.annee >= 2015) return p;
+    }
+  } catch { /* ignore */ }
+  return { mois: new Date().getMonth() + 1, annee: THIS_YEAR };
+}
+
 export default function CarburantPage() {
-  const [selectedMois, setSelectedMois] = useState<number>(new Date().getMonth() + 1);
-  const [selectedAnnee, setSelectedAnnee] = useState<number>(THIS_YEAR);
+  const init = loadPersistedPeriod();
+  const [selectedMois, setSelectedMois] = useState<number>(init.mois);
+  const [selectedAnnee, setSelectedAnnee] = useState<number>(init.annee);
 
   const [rows,    setRows]    = useState<CarburantRow[]>([]);
   const [stats,   setStats]   = useState<Stats | null>(null);
@@ -245,7 +257,26 @@ export default function CarburantPage() {
     setFiltres(data);
   };
 
-  useEffect(() => { fetchFiltres(); }, []); // eslint-disable-line
+  // Au premier chargement : si aucune préférence sauvegardée, auto-détecter le dernier mois avec données
+  useEffect(() => {
+    fetchFiltres();
+    const hasSaved = !!localStorage.getItem("carburant_period");
+    if (!hasSaved) {
+      axios.get("/api/carburant/periodes").then(({ data }) => {
+        if (data.length > 0) {
+          const last = data[0];
+          setSelectedMois(last.mois);
+          setSelectedAnnee(last.annee);
+        }
+      }).catch(() => {});
+    }
+  }, []); // eslint-disable-line
+
+  // Persister mois/année dans localStorage à chaque changement
+  useEffect(() => {
+    try { localStorage.setItem("carburant_period", JSON.stringify({ mois: selectedMois, annee: selectedAnnee })); }
+    catch { /* ignore */ }
+  }, [selectedMois, selectedAnnee]);
 
   useEffect(() => {
     setPage(1);
