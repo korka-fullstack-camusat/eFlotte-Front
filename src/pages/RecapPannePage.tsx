@@ -387,17 +387,22 @@ export default function RecapPannePage() {
     return rows.filter(v => {
       if (filterGroup && v.car_group !== filterGroup) return false;
       if (filterFuel && v.type_carburant !== filterFuel) return false;
+      if (kpiFilter === "service"     && normStatut(v.statut_actuel) !== "EN_SERVICE")      return false;
+      if (kpiFilter === "maintenance" && normStatut(v.statut_actuel) !== "EN_MAINTENANCE")  return false;
+      if (kpiFilter === "immobilise"  && !normStatut(v.statut_actuel).startsWith("IMMOBILIS")) return false;
       if (q && ![v.immatriculation, v.marque, v.modele, v.chauffeur, v.car_group]
         .some(f => (f ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
   }, [rows, search, filterGroup, filterFuel]);
 
-  /* KPIs dynamiques basés sur les lignes filtrées */
-  const kpiTotal       = filtered.length;
-  const kpiEnService   = filtered.filter(v => normStatut(v.statut_actuel) === "EN_SERVICE").length;
-  const kpiMaintenance = filtered.filter(v => normStatut(v.statut_actuel) === "EN_MAINTENANCE").length;
-  const kpiImmobilises = filtered.filter(v => normStatut(v.statut_actuel).startsWith("IMMOBILIS")).length;
+  const [kpiFilter, setKpiFilter] = useState<"" | "service" | "maintenance" | "immobilise">("");
+
+  /* KPIs calculés sur toutes les lignes (avant filtre KPI) */
+  const kpiTotal       = rows.length;
+  const kpiEnService   = rows.filter(v => normStatut(v.statut_actuel) === "EN_SERVICE").length;
+  const kpiMaintenance = rows.filter(v => normStatut(v.statut_actuel) === "EN_MAINTENANCE").length;
+  const kpiImmobilises = rows.filter(v => normStatut(v.statut_actuel).startsWith("IMMOBILIS")).length;
 
   const hasFilters = !!(filterGroup || filterFuel);
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
@@ -501,12 +506,36 @@ export default function RecapPannePage() {
         </div>
       </div>
 
-      {/* ── KPI dynamiques ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
-        <KpiCard label="Total véhicules"  value={kpiTotal}       icon={<Car size={20}/>}         bg="bg-camublue-900/10" text="text-camublue-900" />
-        <KpiCard label="En service"       value={kpiEnService}   icon={<CheckCircle size={20}/>} bg="bg-emerald-100"     text="text-emerald-600" />
-        <KpiCard label="En maintenance"   value={kpiMaintenance} icon={<Wrench size={20}/>}      bg="bg-amber-100"       text="text-amber-600" />
-        <KpiCard label="Immobilisés"      value={kpiImmobilises} icon={<Ban size={20}/>}         bg="bg-rose-100"        text="text-rose-600" />
+      {/* ── KPIs-filtres ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        {([
+          { key: "",             label: "Total véhicules", value: kpiTotal,       icon: <Car size={22}/>,         ring: "ring-camublue-900",  bg: "bg-camublue-900/10",  text: "text-camublue-900",  activeBg: "bg-camublue-900",  activeText: "text-white" },
+          { key: "service",      label: "En service",      value: kpiEnService,   icon: <CheckCircle size={22}/>, ring: "ring-emerald-500",   bg: "bg-emerald-50",       text: "text-emerald-700",   activeBg: "bg-emerald-600",   activeText: "text-white" },
+          { key: "maintenance",  label: "En maintenance",  value: kpiMaintenance, icon: <Wrench size={22}/>,      ring: "ring-amber-500",    bg: "bg-amber-50",         text: "text-amber-700",     activeBg: "bg-amber-500",     activeText: "text-white" },
+          { key: "immobilise",   label: "Immobilisés",     value: kpiImmobilises, icon: <Ban size={22}/>,         ring: "ring-rose-500",     bg: "bg-rose-50",          text: "text-rose-700",      activeBg: "bg-rose-600",      activeText: "text-white" },
+        ] as const).map(k => {
+          const isActive = kpiFilter === k.key;
+          return (
+            <button
+              key={k.key}
+              onClick={() => setKpiFilter(isActive ? "" : k.key)}
+              className={`flex items-center gap-4 px-5 py-4 rounded-2xl border-2 transition w-full text-left shadow-sm
+                ${isActive
+                  ? `${k.activeBg} ${k.activeText} border-transparent shadow-md`
+                  : `${k.bg} ${k.text} border-transparent hover:ring-2 ${k.ring}/40`
+                }`}
+            >
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isActive ? "bg-white/20" : k.bg}`}>
+                {k.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-3xl font-bold leading-none">{k.value}</p>
+                <p className={`text-xs font-semibold mt-1 ${isActive ? "opacity-90" : "opacity-70"}`}>{k.label}</p>
+              </div>
+              {isActive && <span className="ml-auto text-xs font-bold opacity-70">✕ filtre actif</span>}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Recherche centrée ── */}
