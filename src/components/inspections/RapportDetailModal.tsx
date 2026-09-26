@@ -94,6 +94,7 @@ function Contenu({ rapport, modele }: { rapport: RapportDetail; modele: Checklis
 
       <section aria-labelledby="photos-titre">
         <h3 id="photos-titre" className="text-sm font-bold text-camublue-900 mb-2">Photos</h3>
+        {rapport.photos.length === 0 && <p className="text-sm text-gray-500">Aucune photo pour ce rapport.</p>}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {modele.photos.filter(p => rapport.photos.includes(p.position)).map(p => (
             <Photo key={p.position} rapportId={rapport.id} position={p.position} libelle={p.libelle} />

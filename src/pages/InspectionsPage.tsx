@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
-  Smartphone, Users, CheckCircle2, Clock, AlertTriangle, BellRing, Search, X, Loader2, RefreshCw, Send, CalendarRange,
+  Smartphone, Users, CheckCircle2, Clock, AlertTriangle, BellRing, Search, X, Loader2, RefreshCw, Send, CalendarRange, Eye,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import AppLayout from "@/components/layout/AppLayout";
@@ -23,6 +23,15 @@ function Erreur({ onRetry }: { onRetry: () => void }) {
         <RefreshCw size={14} /> Réessayer
       </button>
     </div>
+  );
+}
+
+function BoutonVoir({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button onClick={onClick} aria-label={label} title={label}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-camublue-900 text-white hover:bg-camublue-900/90 text-xs font-semibold">
+      <Eye size={13} aria-hidden /> Voir
+    </button>
   );
 }
 
@@ -254,7 +263,7 @@ export default function InspectionsPage() {
                     <th scope="col" className="text-left px-4 py-2.5 font-semibold">Dernier rapport</th>
                     <th scope="col" className="text-center px-4 py-2.5 font-semibold">Rapports</th>
                     <th scope="col" className="text-left px-4 py-2.5 font-semibold">Relances en attente</th>
-                    {!isViewer && <th scope="col" className="text-center px-4 py-2.5 font-semibold">Action</th>}
+                    <th scope="col" className="text-center px-4 py-2.5 font-semibold">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -289,16 +298,23 @@ export default function InspectionsPage() {
                           ? <>{s.relances_en_attente} <span className="text-xs text-gray-400">· dernière le {formatDate(s.derniere_relance, true)}</span></>
                           : "—"}
                       </td>
-                      {!isViewer && (
-                        <td className="px-4 py-2.5 text-center">
-                          {!s.envoye_cette_semaine && (
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-center gap-2">
+                          {s.dernier_rapport_id ? (
+                            <BoutonVoir onClick={() => setDetail(s.dernier_rapport_id)} label={`Voir le dernier rapport de ${s.full_name || s.username}`} />
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-300" title="Aucun rapport envoyé">
+                              <Eye size={13} /> Voir
+                            </span>
+                          )}
+                          {!isViewer && !s.envoye_cette_semaine && (
                             <button onClick={() => setRelance({ cible: s, message: "" })}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 text-xs font-semibold">
                               <BellRing size={13} /> Relancer
                             </button>
                           )}
-                        </td>
-                      )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -348,6 +364,7 @@ export default function InspectionsPage() {
                       <th scope="col" className="text-left px-4 py-2.5 font-semibold">Véhicule</th>
                       <th scope="col" className="text-right px-4 py-2.5 font-semibold">Kilométrage</th>
                       <th scope="col" className="text-left px-4 py-2.5 font-semibold">Statut</th>
+                      <th scope="col" className="text-center px-4 py-2.5 font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -365,6 +382,9 @@ export default function InspectionsPage() {
                         </td>
                         <td className="px-4 py-2.5 text-gray-600 text-right whitespace-nowrap">{formatKm(r.kilometrage)}</td>
                         <td className="px-4 py-2.5"><StatutRapport rapport={r} /></td>
+                        <td className="px-4 py-2.5 text-center" onClick={e => e.stopPropagation()}>
+                          <BoutonVoir onClick={() => setDetail(r.id)} label={`Voir le rapport du ${formatDate(r.created_at, true)}`} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
