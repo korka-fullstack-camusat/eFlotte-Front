@@ -13,6 +13,8 @@ name: eflotte-front
 services:
   front:
     build: .
+    container_name: eflotte-front
+    restart: unless-stopped
     ports:
       - "${FRONT_PORT:-5175}:5175"
     environment:
@@ -22,3 +24,9 @@ services:
       - /app/node_modules
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5175"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
