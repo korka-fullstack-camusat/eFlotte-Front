@@ -494,9 +494,8 @@ export interface StatsInspections {
 }
 
 export interface RapportsFilters {
-  q?: string;
+  user_id?: number;
   statut?: "conforme" | "anomalies" | "critique" | "";
-  type_rapport?: string;
   date_debut?: string;
   date_fin?: string;
 }
