@@ -13,14 +13,12 @@ type Photo = { blob: Blob; url: string };
 
 interface Brouillon {
   etape: number;
-  type_rapport: string;
   immatriculation: string;
   kilometrage: string;
   visite_technique: string;
   items: Record<string, ReponseItem>;
   autres: Record<string, string>;
   commentaires: string;
-  nom_instructeur: string;
 }
 
 // Les réponses sont gardées sur le téléphone si l'app est fermée en cours de saisie
@@ -91,7 +89,6 @@ export default function NouveauRapportModal({
   const brouillon = useMemo(() => lireBrouillon(espace.username), [espace.username]);
 
   const [etape, setEtape] = useState(brouillon?.etape ?? 0);
-  const [typeRapport, setTypeRapport] = useState(brouillon?.type_rapport ?? "INSPECTION");
   // Véhicule du compte : jamais redemandé. Choisi une seule fois s'il n'est pas encore attribué.
   const [immatriculation, setImmatriculation] = useState(espace.vehicule_plaque ?? brouillon?.immatriculation ?? "");
   const [kilometrage, setKilometrage] = useState(brouillon?.kilometrage ?? "");
@@ -99,7 +96,6 @@ export default function NouveauRapportModal({
   const [items, setItems] = useState<Record<string, ReponseItem>>(brouillon?.items ?? {});
   const [autres, setAutres] = useState<Record<string, string>>(brouillon?.autres ?? {});
   const [commentaires, setCommentaires] = useState(brouillon?.commentaires ?? "");
-  const [nomInstructeur, setNomInstructeur] = useState(brouillon?.nom_instructeur ?? "");
   const [photos, setPhotos] = useState<Record<string, Photo>>({});
   const [photoEnCours, setPhotoEnCours] = useState<string | null>(null);
   const [signature, setSignature] = useState("");
@@ -121,10 +117,10 @@ export default function NouveauRapportModal({
 
   useEffect(() => {
     ecrireBrouillon(espace.username, {
-      etape, type_rapport: typeRapport, immatriculation, kilometrage, visite_technique: visiteTechnique,
-      items, autres, commentaires, nom_instructeur: nomInstructeur,
+      etape, immatriculation, kilometrage, visite_technique: visiteTechnique,
+      items, autres, commentaires,
     });
-  }, [espace.username, etape, typeRapport, immatriculation, kilometrage, visiteTechnique, items, autres, commentaires, nomInstructeur]);
+  }, [espace.username, etape, immatriculation, kilometrage, visiteTechnique, items, autres, commentaires]);
 
   // Étapes : infos, une par section du formulaire, photos, validation
   const etapes = useMemo(() => modele ? [
@@ -235,13 +231,14 @@ export default function NouveauRapportModal({
     try {
       const rapport = await inspectionService.envoyer(
         {
-          type_rapport: typeRapport,
+          // Mêmes questions quel que soit le cas : le type est fixé
+          type_rapport: "INSPECTION",
           immatriculation,
           kilometrage: Number(kilometrage),
           visite_technique: vtConnue ? null : visiteTechnique || null,
           reponses: { items, autres },
           commentaires,
-          nom_instructeur: typeRapport === "RESTITUTION" ? nomInstructeur : "",
+          nom_instructeur: "",
           signature,
         },
         Object.fromEntries(Object.entries(photos).map(([k, p]) => [k, p.blob])),
@@ -348,21 +345,6 @@ export default function NouveauRapportModal({
                   </div>
                 </div>
               )}
-
-              <fieldset>
-                <legend className="block text-xs font-semibold text-gray-600 mb-1.5">Type de rapport</legend>
-                <div className="grid grid-cols-2 gap-2">
-                  {modele.types_rapport.map(t => (
-                    <button key={t.valeur} type="button" aria-pressed={typeRapport === t.valeur}
-                      onClick={() => setTypeRapport(t.valeur)}
-                      className={`min-h-[44px] rounded-xl text-sm font-semibold border-2 transition ${
-                        typeRapport === t.valeur ? "bg-camublue-900 border-camublue-900 text-white" : "bg-white border-gray-200 text-gray-700"
-                      }`}>
-                      {t.libelle}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
 
               <div>
                 <label htmlFor="rap-km" className="block text-xs font-semibold text-gray-600 mb-1.5">Kilométrage au compteur (km) *</label>
@@ -491,14 +473,6 @@ export default function NouveauRapportModal({
                 <textarea id="rap-com" rows={3} value={commentaires} onChange={e => setCommentaires(e.target.value)}
                   className="input-base bg-white" placeholder="Remarques générales (facultatif)" />
               </div>
-
-              {typeRapport === "RESTITUTION" && (
-                <div>
-                  <label htmlFor="rap-instr" className="block text-xs font-semibold text-gray-600 mb-1.5">Nom et prénom de l'instructeur</label>
-                  <input id="rap-instr" type="text" value={nomInstructeur} onChange={e => setNomInstructeur(e.target.value)}
-                    className="input-base min-h-[44px] bg-white" />
-                </div>
-              )}
 
               <div>
                 <p className="text-xs font-semibold text-gray-600 mb-1.5">
