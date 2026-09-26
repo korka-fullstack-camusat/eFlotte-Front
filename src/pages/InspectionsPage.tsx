@@ -204,26 +204,6 @@ export default function InspectionsPage() {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <RechercheChauffeur chauffeurs={suivi} selection={chauffeur} onSelect={choisirChauffeur} />
-          <div className="flex items-center gap-2 rounded-xl bg-white ring-1 ring-gray-100 shadow-sm px-3 py-1.5" role="group" aria-label="Période">
-            <CalendarRange size={16} className="text-camublue-900 shrink-0" aria-hidden />
-            <label className="flex items-center gap-1.5 text-xs text-gray-500">Du
-              <input type="date" value={filtres.date_debut} max={filtres.date_fin || undefined}
-                onChange={e => setPeriode("date_debut", e.target.value)} className="text-sm text-gray-700 bg-transparent outline-none" />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-gray-500">au
-              <input type="date" value={filtres.date_fin} min={filtres.date_debut || undefined}
-                onChange={e => setPeriode("date_fin", e.target.value)} className="text-sm text-gray-700 bg-transparent outline-none" />
-            </label>
-            {periodeActive && (
-              <button onClick={() => { setFiltres(f => ({ ...f, date_debut: "", date_fin: "" })); setPage(1); }}
-                aria-label="Effacer la période" className="w-6 h-6 rounded-md text-gray-400 hover:text-red-600 flex items-center justify-center">
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -232,6 +212,27 @@ export default function InspectionsPage() {
         <KpiCard label="En retard" value={stats?.chauffeurs_en_retard ?? 0} icon={<Clock size={20} />} bg="bg-amber-100" text="text-amber-600" />
         <KpiCard label="Rapports cette semaine" value={stats?.rapports_semaine ?? 0} icon={<Smartphone size={20} />} bg="bg-violet-100" text="text-violet-600" />
         <KpiCard label="Avec point critique" value={stats?.rapports_critiques_semaine ?? 0} icon={<AlertTriangle size={20} />} bg="bg-red-100" text="text-red-600" />
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
+        <RechercheChauffeur chauffeurs={suivi} selection={chauffeur} onSelect={choisirChauffeur} />
+        <div className="flex items-center gap-2 rounded-xl bg-white ring-1 ring-gray-100 shadow-sm px-3 py-1.5" role="group" aria-label="Période">
+          <CalendarRange size={16} className="text-camublue-900 shrink-0" aria-hidden />
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">Du
+            <input type="date" value={filtres.date_debut} max={filtres.date_fin || undefined}
+              onChange={e => setPeriode("date_debut", e.target.value)} className="text-sm text-gray-700 bg-transparent outline-none" />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">au
+            <input type="date" value={filtres.date_fin} min={filtres.date_debut || undefined}
+              onChange={e => setPeriode("date_fin", e.target.value)} className="text-sm text-gray-700 bg-transparent outline-none" />
+          </label>
+          {periodeActive && (
+            <button onClick={() => { setFiltres(f => ({ ...f, date_debut: "", date_fin: "" })); setPage(1); }}
+              aria-label="Effacer la période" className="w-6 h-6 rounded-md text-gray-400 hover:text-red-600 flex items-center justify-center">
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {onglet === "suivi" ? (
