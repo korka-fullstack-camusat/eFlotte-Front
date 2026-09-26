@@ -22,6 +22,7 @@ const RecapPannePage     = lazy(() => import("@/pages/RecapPannePage"));
 const InspectionsPage    = lazy(() => import("@/pages/InspectionsPage"));
 const ChauffeurHomePage       = lazy(() => import("@/pages/chauffeur/ChauffeurHomePage"));
 const ChauffeurHistoriquePage = lazy(() => import("@/pages/chauffeur/ChauffeurHistoriquePage"));
+const ChauffeurProfilPage     = lazy(() => import("@/pages/chauffeur/ChauffeurProfilPage"));
 
 function PageLoader() {
   return (
@@ -58,6 +59,7 @@ export default function App() {
         {/* App mobile chauffeur */}
         <Route path="/app" element={<ProtectedRoute chauffeur><ChauffeurHomePage /></ProtectedRoute>} />
         <Route path="/app/historique" element={<ProtectedRoute chauffeur><ChauffeurHistoriquePage /></ProtectedRoute>} />
+        <Route path="/app/profil" element={<ProtectedRoute chauffeur><ChauffeurProfilPage /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

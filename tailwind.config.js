@@ -64,6 +64,15 @@ export default {
       boxShadow: {
         card: "0 2px 8px 0 rgb(0 0 0 / 0.07)",
       },
+      keyframes: {
+        wave: {
+          "0%, 60%, 100%": { transform: "rotate(0deg)" },
+          "10%, 30%": { transform: "rotate(14deg)" },
+          "20%": { transform: "rotate(-8deg)" },
+          "40%": { transform: "rotate(-4deg)" },
+          "50%": { transform: "rotate(10deg)" },
+        },
+      },
     }
   },
   plugins: [require("tailwindcss-animate")],

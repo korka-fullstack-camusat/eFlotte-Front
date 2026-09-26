@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  X, ChevronLeft, ChevronRight, Send, Camera, CheckCheck, AlertTriangle, Loader2, RotateCcw,
+  X, ChevronLeft, ChevronRight, Send, Camera, CheckCheck, AlertTriangle, Loader2, RotateCcw, Car,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { inspectionService } from "@/services/inspections";
@@ -17,7 +17,6 @@ interface Brouillon {
   immatriculation: string;
   kilometrage: string;
   visite_technique: string;
-  filiale: string;
   items: Record<string, ReponseItem>;
   autres: Record<string, string>;
   commentaires: string;
@@ -96,7 +95,7 @@ export default function NouveauRapportModal({
   const [immatriculation, setImmatriculation] = useState(brouillon?.immatriculation ?? espace.vehicule_plaque ?? "");
   const [kilometrage, setKilometrage] = useState(brouillon?.kilometrage ?? "");
   const [visiteTechnique, setVisiteTechnique] = useState(brouillon?.visite_technique ?? "");
-  const [filiale, setFiliale] = useState(brouillon?.filiale ?? espace.filiale_precedente ?? "");
+  const [changerVehicule, setChangerVehicule] = useState(false);
   const [items, setItems] = useState<Record<string, ReponseItem>>(brouillon?.items ?? {});
   const [autres, setAutres] = useState<Record<string, string>>(brouillon?.autres ?? {});
   const [commentaires, setCommentaires] = useState(brouillon?.commentaires ?? "");
@@ -123,9 +122,9 @@ export default function NouveauRapportModal({
   useEffect(() => {
     ecrireBrouillon(espace.username, {
       etape, type_rapport: typeRapport, immatriculation, kilometrage, visite_technique: visiteTechnique,
-      filiale, items, autres, commentaires, nom_instructeur: nomInstructeur,
+      items, autres, commentaires, nom_instructeur: nomInstructeur,
     });
-  }, [espace.username, etape, typeRapport, immatriculation, kilometrage, visiteTechnique, filiale, items, autres, commentaires, nomInstructeur]);
+  }, [espace.username, etape, typeRapport, immatriculation, kilometrage, visiteTechnique, items, autres, commentaires, nomInstructeur]);
 
   // Étapes : infos, une par section du formulaire, photos, validation
   const etapes = useMemo(() => modele ? [
@@ -137,6 +136,15 @@ export default function NouveauRapportModal({
 
   // Brouillon d'une ancienne version du formulaire : repartir du début
   useEffect(() => { if (etapes.length && etape >= etapes.length) setEtape(0); }, [etapes.length, etape]);
+
+  // Ce que la plateforme sait déjà du véhicule choisi : pas besoin de le redemander
+  const vehicule: VehiculeMini | null =
+    (espace.vehicule?.plaque_immatriculation === immatriculation ? espace.vehicule : null)
+    ?? vehicules?.find(v => v.plaque_immatriculation === immatriculation) ?? null;
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const vtConnue = vehicule?.visite_technique && vehicule.visite_technique >= aujourdhui ? vehicule.visite_technique : null;
+  const kmBas = vehicule?.kilometrage != null && kilometrage !== "" && Number(kilometrage) < vehicule.kilometrage;
+  const choixVehicule = !espace.vehicule_plaque || changerVehicule;
 
   const section = modele?.sections.find(s => s.cle === etapes[etape]?.cle);
   const derniere = etape === etapes.length - 1;
@@ -213,6 +221,12 @@ export default function NouveauRapportModal({
     onClose();
   };
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !envoi) fermer(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const envoyer = async () => {
     if (!modele) return;
     const incomplete = etapes.findIndex((_, i) => manquants(modele, i).length > 0);
@@ -224,8 +238,7 @@ export default function NouveauRapportModal({
           type_rapport: typeRapport,
           immatriculation,
           kilometrage: Number(kilometrage),
-          filiale,
-          visite_technique: visiteTechnique || null,
+          visite_technique: vtConnue ? null : visiteTechnique || null,
           reponses: { items, autres },
           commentaires,
           nom_instructeur: typeRapport === "RESTITUTION" ? nomInstructeur : "",
@@ -255,12 +268,13 @@ export default function NouveauRapportModal({
   ) : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/40 sm:p-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="nouveau-rapport-titre"
-        className="bg-camugray-100 w-full sm:max-w-lg h-full sm:h-[90vh] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 sm:p-4 animate-in fade-in duration-200" onClick={fermer}>
+      <div role="dialog" aria-modal="true" aria-labelledby="nouveau-rapport-titre" onClick={e => e.stopPropagation()}
+        className="bg-camugray-100 w-full sm:max-w-lg h-[94dvh] sm:h-[90vh] rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 sm:zoom-in-95 sm:slide-in-from-bottom-4">
 
         {/* En-tête + progression */}
-        <div className="bg-camublue-900 text-white px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3 shrink-0">
+        <div className="bg-camublue-900 text-white px-4 pt-2 pb-3 shrink-0">
+          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/30 sm:hidden" aria-hidden />
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-wide text-white/70">
@@ -288,6 +302,47 @@ export default function NouveauRapportModal({
             <div className="flex justify-center py-16"><Loader2 className="animate-spin text-camublue-900" aria-label="Chargement" /></div>
           ) : etapes[etape].cle === "infos" ? (
             <div className="space-y-4">
+              {/* Véhicule : repris du compte, on ne le redemande pas */}
+              {choixVehicule ? (
+                <div>
+                  <label htmlFor="rap-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Véhicule *</label>
+                  <select id="rap-vehicule" value={immatriculation} onChange={e => setImmatriculation(e.target.value)}
+                    className="input-base min-h-[44px] bg-white" disabled={!vehicules}>
+                    <option value="">{vehicules ? "Choisir le véhicule" : "Chargement…"}</option>
+                    {immatriculation && vehicules && !vehicules.some(v => v.plaque_immatriculation === immatriculation) && (
+                      <option value={immatriculation}>{immatriculation}</option>
+                    )}
+                    {vehicules?.map(v => (
+                      <option key={v.plaque_immatriculation} value={v.plaque_immatriculation}>
+                        {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {espace.vehicule_plaque && (
+                    <button type="button" onClick={() => { setImmatriculation(espace.vehicule_plaque!); setChangerVehicule(false); }}
+                      className="mt-1.5 text-xs font-semibold text-camublue-900 hover:underline">
+                      Revenir à mon véhicule ({espace.vehicule_plaque})
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-100 shadow-sm flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-camublue-900/10 flex items-center justify-center shrink-0">
+                    <Car size={22} className="text-camublue-900" aria-hidden />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800">{immatriculation}</p>
+                    {vehicule && (vehicule.marque || vehicule.modele) && (
+                      <p className="text-xs text-gray-500 truncate">{[vehicule.marque, vehicule.modele].filter(Boolean).join(" ")}</p>
+                    )}
+                  </div>
+                  <button type="button" onClick={() => setChangerVehicule(true)}
+                    className="shrink-0 text-xs font-semibold text-camublue-900 hover:underline">
+                    Changer
+                  </button>
+                </div>
+              )}
+
               <fieldset>
                 <legend className="block text-xs font-semibold text-gray-600 mb-1.5">Type de rapport</legend>
                 <div className="grid grid-cols-2 gap-2">
@@ -304,42 +359,32 @@ export default function NouveauRapportModal({
               </fieldset>
 
               <div>
-                <label htmlFor="rap-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Véhicule *</label>
-                <select id="rap-vehicule" value={immatriculation} onChange={e => setImmatriculation(e.target.value)}
-                  className="input-base min-h-[44px] bg-white" disabled={!vehicules}>
-                  <option value="">{vehicules ? "Choisir le véhicule" : "Chargement…"}</option>
-                  {immatriculation && vehicules && !vehicules.some(v => v.plaque_immatriculation === immatriculation) && (
-                    <option value={immatriculation}>{immatriculation}</option>
-                  )}
-                  {vehicules?.map(v => (
-                    <option key={v.plaque_immatriculation} value={v.plaque_immatriculation}>
-                      {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
-                    </option>
-                  ))}
-                </select>
-                {espace.vehicule_plaque && immatriculation && immatriculation !== espace.vehicule_plaque && (
-                  <p className="mt-1 text-xs text-amber-700">Ce n'est pas le véhicule qui vous est attribué ({espace.vehicule_plaque}).</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="rap-km" className="block text-xs font-semibold text-gray-600 mb-1.5">Kilométrage actuel (km) *</label>
+                <label htmlFor="rap-km" className="block text-xs font-semibold text-gray-600 mb-1.5">Kilométrage au compteur (km) *</label>
                 <input id="rap-km" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
                   value={kilometrage} onChange={e => setKilometrage(e.target.value.replace(/\D/g, ""))}
-                  placeholder="ex : 45230" className="input-base min-h-[44px] bg-white" />
+                  placeholder={vehicule?.kilometrage != null ? `Dernier relevé : ${vehicule.kilometrage.toLocaleString("fr-FR")}` : "ex : 45230"}
+                  aria-describedby="rap-km-aide" className="input-base min-h-[44px] bg-white" />
+                <p id="rap-km-aide" className={`mt-1 text-xs ${kmBas ? "text-amber-700" : "text-gray-400"}`}>
+                  {kmBas
+                    ? `Inférieur au dernier relevé (${vehicule!.kilometrage!.toLocaleString("fr-FR")} km) : vérifiez le compteur.`
+                    : vehicule?.kilometrage != null ? `Dernier relevé : ${vehicule.kilometrage.toLocaleString("fr-FR")} km` : "\u00a0"}
+                </p>
               </div>
 
-              <div>
-                <label htmlFor="rap-vt" className="block text-xs font-semibold text-gray-600 mb-1.5">Date de la visite technique</label>
-                <input id="rap-vt" type="date" value={visiteTechnique} onChange={e => setVisiteTechnique(e.target.value)}
-                  className="input-base min-h-[44px] bg-white" />
-              </div>
-
-              <div>
-                <label htmlFor="rap-filiale" className="block text-xs font-semibold text-gray-600 mb-1.5">Filiale</label>
-                <input id="rap-filiale" type="text" value={filiale} onChange={e => setFiliale(e.target.value)}
-                  placeholder="ex : Camusat Sénégal" className="input-base min-h-[44px] bg-white" />
-              </div>
+              {/* Visite technique : demandée seulement si inconnue ou dépassée */}
+              {vtConnue ? (
+                <p className="text-xs text-gray-500">
+                  Visite technique valable jusqu'au <span className="font-semibold text-gray-700">{new Date(`${vtConnue}T00:00:00`).toLocaleDateString("fr-FR")}</span>.
+                </p>
+              ) : (
+                <div>
+                  <label htmlFor="rap-vt" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    Date de la visite technique {vehicule?.visite_technique && <span className="font-normal text-amber-700">(la dernière connue est dépassée)</span>}
+                  </label>
+                  <input id="rap-vt" type="date" value={visiteTechnique} onChange={e => setVisiteTechnique(e.target.value)}
+                    className="input-base min-h-[44px] bg-white" />
+                </div>
+              )}
             </div>
           ) : section ? (
             <div className="space-y-3">

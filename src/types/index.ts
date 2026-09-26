@@ -442,6 +442,9 @@ export interface VehiculeMini {
   plaque_immatriculation: string;
   marque: string | null;
   modele: string | null;
+  kilometrage: number | null;
+  /** Dernière visite technique relevée dans un rapport précédent */
+  visite_technique: string | null;
 }
 
 export interface RelanceChecklist {
@@ -454,6 +457,8 @@ export interface RelanceChecklist {
 export interface MonEspace {
   username: string;
   full_name: string | null;
+  email: string | null;
+  nb_rapports: number;
   vehicule: VehiculeMini | null;
   vehicule_plaque: string | null;
   envoye_cette_semaine: boolean;
@@ -498,7 +503,6 @@ export interface NouveauRapportPayload {
   type_rapport: string;
   immatriculation: string;
   kilometrage: number;
-  filiale: string;
   visite_technique: string | null;
   reponses: ReponsesRapport;
   commentaires: string;

@@ -55,7 +55,7 @@ function Contenu({ rapport, modele }: { rapport: RapportDetail; modele: Checklis
           ["Véhicule", [rapport.marque, rapport.modele].filter(Boolean).join(" ") || "—"],
           ["Kilométrage", formatKm(rapport.kilometrage)],
           ["Visite technique", formatDate(rapport.visite_technique)],
-          ["Filiale", rapport.filiale || "—"],
+          ...(rapport.filiale ? [["Filiale", rapport.filiale]] : []),
           ...(rapport.nom_instructeur ? [["Instructeur", rapport.nom_instructeur]] : []),
         ].map(([k, v]) => (
           <div key={k} className="rounded-xl bg-gray-50 px-3 py-2">

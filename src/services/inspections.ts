@@ -28,6 +28,10 @@ export const inspectionService = {
     return (await axios.post(`${BASE}/rapports`, form)).data;
   },
 
+  changerMotDePasse: async (ancien: string, nouveau: string): Promise<void> => {
+    await axios.post("/api/auth/me/mot-de-passe", { ancien, nouveau });
+  },
+
   // ── Plateforme ──
   stats: async (): Promise<StatsInspections> => (await axios.get(`${BASE}/stats`)).data,
   suivi: async (): Promise<SuiviChauffeur[]> => (await axios.get(`${BASE}/suivi`)).data,

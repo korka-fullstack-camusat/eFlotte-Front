@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, BellRing, CheckCircle2, Clock, Car, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { Plus, BellRing, Car, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import ChauffeurLayout from "@/components/inspections/ChauffeurLayout";
 import NouveauRapportModal from "@/components/inspections/NouveauRapportModal";
 import RapportDetailModal from "@/components/inspections/RapportDetailModal";
@@ -21,8 +21,6 @@ export default function ChauffeurHomePage() {
   }, []);
   useEffect(charger, [charger]);
 
-  const prenom = (espace?.full_name || espace?.username || "").split(" ")[0];
-
   return (
     <ChauffeurLayout>
       {erreur ? (
@@ -36,12 +34,7 @@ export default function ChauffeurHomePage() {
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-camublue-900" aria-label="Chargement" /></div>
       ) : (
         <div className="space-y-5">
-          <section>
-            <h1 className="text-2xl font-bold text-camublue-900">Bonjour {prenom}</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Bienvenue sur votre espace. Faites l'inspection de votre véhicule et envoyez votre checklist chaque semaine.
-            </p>
-          </section>
+          <h1 className="sr-only">Accueil</h1>
 
           {espace.relances.length > 0 && !espace.envoye_cette_semaine && (
             <div role="alert" className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 p-4 flex gap-3">
@@ -60,35 +53,22 @@ export default function ChauffeurHomePage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className={`rounded-2xl p-4 ring-1 flex items-center gap-3 ${espace.envoye_cette_semaine ? "bg-emerald-50 ring-emerald-200" : "bg-white ring-gray-100 shadow-sm"}`}>
-              {espace.envoye_cette_semaine
-                ? <CheckCircle2 size={26} className="text-emerald-600 shrink-0" aria-hidden />
-                : <Clock size={26} className="text-amber-500 shrink-0" aria-hidden />}
-              <div>
-                <p className="text-sm font-semibold text-gray-800">
-                  {espace.envoye_cette_semaine ? "Checklist de la semaine envoyée" : "Checklist de la semaine à faire"}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {espace.dernier_rapport ? `Dernier envoi : ${formatDate(espace.dernier_rapport.created_at)}` : "Aucun envoi pour l'instant"}
-                </p>
-              </div>
+          <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-100 shadow-sm flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-camublue-900/10 flex items-center justify-center shrink-0">
+              <Car size={22} className="text-camublue-900" aria-hidden />
             </div>
-            <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-100 shadow-sm flex items-center gap-3">
-              <Car size={26} className="text-camublue-900 shrink-0" aria-hidden />
-              <div className="min-w-0">
-                <p className="text-xs text-gray-500">Mon véhicule</p>
-                {espace.vehicule_plaque ? (
-                  <p className="text-sm font-semibold text-gray-800 truncate">
-                    {espace.vehicule_plaque}
-                    {espace.vehicule && (espace.vehicule.marque || espace.vehicule.modele) && (
-                      <span className="font-normal text-gray-500"> · {[espace.vehicule.marque, espace.vehicule.modele].filter(Boolean).join(" ")}</span>
-                    )}
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-500">Aucun véhicule attribué</p>
-                )}
-              </div>
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500">Mon véhicule</p>
+              {espace.vehicule_plaque ? (
+                <p className="text-sm font-semibold text-gray-800 truncate">
+                  {espace.vehicule_plaque}
+                  {espace.vehicule && (espace.vehicule.marque || espace.vehicule.modele) && (
+                    <span className="font-normal text-gray-500"> · {[espace.vehicule.marque, espace.vehicule.modele].filter(Boolean).join(" ")}</span>
+                  )}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500">Aucun véhicule attribué</p>
+              )}
             </div>
           </div>
 
