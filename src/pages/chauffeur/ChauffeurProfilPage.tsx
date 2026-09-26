@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Car, Mail, FileText, KeyRound, LogOut, Loader2, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { Car, Building2, Mail, FileText, KeyRound, LogOut, Loader2, RefreshCw, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
 import ChauffeurLayout from "@/components/inspections/ChauffeurLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -78,6 +78,13 @@ export default function ChauffeurProfilPage() {
                     ? <>{espace.vehicule_plaque}{espace.vehicule && (espace.vehicule.marque || espace.vehicule.modele) ? ` · ${[espace.vehicule.marque, espace.vehicule.modele].filter(Boolean).join(" ")}` : ""}</>
                     : "Aucun"}
                 </p>
+              </div>
+            </li>
+            <li className="flex items-center gap-3 px-4 py-3">
+              <Building2 size={18} className="text-camublue-900 shrink-0" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500">Filiale</p>
+                <p className="text-sm font-medium text-gray-800 truncate">{espace.filiale || "Non renseignée"}</p>
               </div>
             </li>
             <li className="flex items-center gap-3 px-4 py-3">

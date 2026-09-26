@@ -17,7 +17,7 @@ const ROLE_LABELS: Record<string, string> = {
   CHAUFFEUR: "Chauffeur (app mobile)",
 };
 
-const EMPTY = { username: "", password: "", full_name: "", email: "", role: "EDITOR", vehicule_plaque: "" };
+const EMPTY = { username: "", password: "", full_name: "", email: "", role: "EDITOR", vehicule_plaque: "", filiale: "" };
 
 export default function UsersPage() {
   const { isAdmin, user: currentUser } = useAuth();
@@ -45,7 +45,7 @@ export default function UsersPage() {
   const openCreate = () => { setEditing(null); setForm(EMPTY); setModal(true); };
   const openEdit = (u: UserAccount) => {
     setEditing(u);
-    setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role, vehicule_plaque: u.vehicule_plaque ?? "" });
+    setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role, vehicule_plaque: u.vehicule_plaque ?? "", filiale: u.filiale ?? "" });
     setModal(true);
   };
 
@@ -56,12 +56,13 @@ export default function UsersPage() {
         const payload: any = {
           full_name: form.full_name, email: form.email, role: form.role,
           vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "",
+          filiale: form.role === "CHAUFFEUR" ? form.filiale : "",
         };
         if (form.password) payload.password = form.password;
         await userService.update(editing.id, payload);
         toast.success("Utilisateur mis à jour");
       } else {
-        await userService.create({ ...form, username: form.username.trim(), vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "" });
+        await userService.create({ ...form, username: form.username.trim(), vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "", filiale: form.role === "CHAUFFEUR" ? form.filiale : "" });
         toast.success("Utilisateur créé");
       }
       setModal(false);
@@ -214,6 +215,16 @@ export default function UsersPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+              {form.role === "CHAUFFEUR" && (
+                <div>
+                  <label htmlFor="user-filiale" className="block text-xs font-semibold text-gray-600 mb-1.5">Filiale</label>
+                  <input id="user-filiale" type="text" value={form.filiale} placeholder="ex : Camusat Sénégal"
+                    onChange={e => setForm(f => ({ ...f, filiale: e.target.value }))} className="input-base" />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Véhicule et filiale sont repris dans chaque rapport : le chauffeur n'a pas à les saisir.
+                  </p>
                 </div>
               )}
               <div>

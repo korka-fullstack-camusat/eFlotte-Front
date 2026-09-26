@@ -379,6 +379,7 @@ export interface UserAccount {
   is_active: boolean;
   role: string;
   vehicule_plaque: string | null;
+  filiale: string | null;
 }
 
 // ── Checklists mobiles (inspection / restitution) ────────────────────────────
@@ -461,6 +462,7 @@ export interface MonEspace {
   nb_rapports: number;
   vehicule: VehiculeMini | null;
   vehicule_plaque: string | null;
+  filiale: string | null;
   envoye_cette_semaine: boolean;
   dernier_rapport: RapportResume | null;
   derniers_rapports: RapportResume[];
@@ -503,6 +505,8 @@ export interface NouveauRapportPayload {
   type_rapport: string;
   immatriculation: string;
   kilometrage: number;
+  /** Envoyés seulement au premier rapport, quand le compte ne les a pas encore */
+  filiale?: string;
   visite_technique: string | null;
   reponses: ReponsesRapport;
   commentaires: string;

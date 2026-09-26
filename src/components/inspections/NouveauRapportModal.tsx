@@ -92,10 +92,11 @@ export default function NouveauRapportModal({
 
   const [etape, setEtape] = useState(brouillon?.etape ?? 0);
   const [typeRapport, setTypeRapport] = useState(brouillon?.type_rapport ?? "INSPECTION");
-  const [immatriculation, setImmatriculation] = useState(brouillon?.immatriculation ?? espace.vehicule_plaque ?? "");
+  // Véhicule du compte : jamais redemandé. Choisi une seule fois s'il n'est pas encore attribué.
+  const [immatriculation, setImmatriculation] = useState(espace.vehicule_plaque ?? brouillon?.immatriculation ?? "");
+  const [filiale, setFiliale] = useState(espace.filiale ?? "");
   const [kilometrage, setKilometrage] = useState(brouillon?.kilometrage ?? "");
   const [visiteTechnique, setVisiteTechnique] = useState(brouillon?.visite_technique ?? "");
-  const [changerVehicule, setChangerVehicule] = useState(false);
   const [items, setItems] = useState<Record<string, ReponseItem>>(brouillon?.items ?? {});
   const [autres, setAutres] = useState<Record<string, string>>(brouillon?.autres ?? {});
   const [commentaires, setCommentaires] = useState(brouillon?.commentaires ?? "");
@@ -144,7 +145,8 @@ export default function NouveauRapportModal({
   const aujourdhui = new Date().toISOString().slice(0, 10);
   const vtConnue = vehicule?.visite_technique && vehicule.visite_technique >= aujourdhui ? vehicule.visite_technique : null;
   const kmBas = vehicule?.kilometrage != null && kilometrage !== "" && Number(kilometrage) < vehicule.kilometrage;
-  const choixVehicule = !espace.vehicule_plaque || changerVehicule;
+  const choixVehicule = !espace.vehicule_plaque;
+  const choixFiliale = !espace.filiale;
 
   const section = modele?.sections.find(s => s.cle === etapes[etape]?.cle);
   const derniere = etape === etapes.length - 1;
@@ -154,6 +156,7 @@ export default function NouveauRapportModal({
     if (cle === "infos") {
       const out: string[] = [];
       if (!immatriculation) out.push("véhicule");
+      if (choixFiliale && !filiale.trim()) out.push("filiale");
       if (kilometrage === "" || !/^\d+$/.test(kilometrage)) out.push("kilométrage");
       return out;
     }
@@ -237,6 +240,7 @@ export default function NouveauRapportModal({
         {
           type_rapport: typeRapport,
           immatriculation,
+          ...(choixFiliale ? { filiale: filiale.trim() } : {}),
           kilometrage: Number(kilometrage),
           visite_technique: vtConnue ? null : visiteTechnique || null,
           reponses: { items, autres },
@@ -302,44 +306,59 @@ export default function NouveauRapportModal({
             <div className="flex justify-center py-16"><Loader2 className="animate-spin text-camublue-900" aria-label="Chargement" /></div>
           ) : etapes[etape].cle === "infos" ? (
             <div className="space-y-4">
-              {/* Véhicule : repris du compte, on ne le redemande pas */}
-              {choixVehicule ? (
-                <div>
-                  <label htmlFor="rap-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Véhicule *</label>
-                  <select id="rap-vehicule" value={immatriculation} onChange={e => setImmatriculation(e.target.value)}
-                    className="input-base min-h-[44px] bg-white" disabled={!vehicules}>
-                    <option value="">{vehicules ? "Choisir le véhicule" : "Chargement…"}</option>
-                    {immatriculation && vehicules && !vehicules.some(v => v.plaque_immatriculation === immatriculation) && (
-                      <option value={immatriculation}>{immatriculation}</option>
-                    )}
-                    {vehicules?.map(v => (
-                      <option key={v.plaque_immatriculation} value={v.plaque_immatriculation}>
-                        {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {espace.vehicule_plaque && (
-                    <button type="button" onClick={() => { setImmatriculation(espace.vehicule_plaque!); setChangerVehicule(false); }}
-                      className="mt-1.5 text-xs font-semibold text-camublue-900 hover:underline">
-                      Revenir à mon véhicule ({espace.vehicule_plaque})
-                    </button>
-                  )}
+              {/* Ce que le compte connaît déjà : affiché, jamais redemandé */}
+              <div className="rounded-2xl bg-white ring-1 ring-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
+                  <div className="w-10 h-10 rounded-xl bg-camublue-900/10 flex items-center justify-center shrink-0">
+                    <Car size={20} className="text-camublue-900" aria-hidden />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">Immatriculation</p>
+                    <p className="font-bold text-gray-800">{immatriculation || "Véhicule à choisir"}</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-100 shadow-sm flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-camublue-900/10 flex items-center justify-center shrink-0">
-                    <Car size={22} className="text-camublue-900" aria-hidden />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-800">{immatriculation}</p>
-                    {vehicule && (vehicule.marque || vehicule.modele) && (
-                      <p className="text-xs text-gray-500 truncate">{[vehicule.marque, vehicule.modele].filter(Boolean).join(" ")}</p>
-                    )}
-                  </div>
-                  <button type="button" onClick={() => setChangerVehicule(true)}
-                    className="shrink-0 text-xs font-semibold text-camublue-900 hover:underline">
-                    Changer
-                  </button>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 px-4 py-3 text-sm">
+                  {([
+                    ["Marque", vehicule?.marque],
+                    ["Modèle", vehicule?.modele],
+                    ["Chauffeur", espace.full_name || espace.username],
+                    ["Filiale", espace.filiale],
+                  ] as const).filter(([, v]) => v).map(([k, v]) => (
+                    <div key={k} className="min-w-0">
+                      <dt className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">{k}</dt>
+                      <dd className="font-medium text-gray-800 truncate">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+
+              {/* Premier rapport seulement : ce qui manque au compte, enregistré pour la suite */}
+              {(choixVehicule || choixFiliale) && (
+                <div className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 p-3 space-y-3">
+                  <p className="text-xs text-amber-800">
+                    À renseigner une seule fois : ce sera enregistré sur votre compte pour les prochains rapports.
+                  </p>
+                  {choixVehicule && (
+                    <div>
+                      <label htmlFor="rap-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Votre véhicule *</label>
+                      <select id="rap-vehicule" value={immatriculation} onChange={e => setImmatriculation(e.target.value)}
+                        className="input-base min-h-[44px] bg-white" disabled={!vehicules}>
+                        <option value="">{vehicules ? "Choisir le véhicule" : "Chargement…"}</option>
+                        {vehicules?.map(v => (
+                          <option key={v.plaque_immatriculation} value={v.plaque_immatriculation}>
+                            {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {choixFiliale && (
+                    <div>
+                      <label htmlFor="rap-filiale" className="block text-xs font-semibold text-gray-600 mb-1.5">Votre filiale *</label>
+                      <input id="rap-filiale" type="text" value={filiale} onChange={e => setFiliale(e.target.value)}
+                        placeholder="ex : Camusat Sénégal" className="input-base min-h-[44px] bg-white" />
+                    </div>
+                  )}
                 </div>
               )}
 
