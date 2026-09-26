@@ -1,12 +1,12 @@
 # Front eFlotte (Vite, rechargement à chaud)
 #
+#   cp .env.example .env      (une seule fois, puis adapter les valeurs)
 #   docker compose up --build
 #
-#   Front → http://localhost:5175   (admin / admin123)
+#   Front → http://localhost:${FRONT_PORT}   (admin / admin123)
 #
-# Lancer d'abord le backend (docker compose up dans eFlotte-Api) : il écoute
-# sur le port 8050 de la machine, que le proxy Vite joint via
-# host.docker.internal. Autre API : VITE_PROXY_TARGET=http://hote:8050 docker compose up
+# Lancer d'abord le backend (docker compose up dans eFlotte-Api).
+# Toutes les valeurs viennent du fichier .env (voir .env.example).
 
 name: eflotte-front
 
@@ -14,9 +14,9 @@ services:
   front:
     build: .
     ports:
-      - "5175:5175"
+      - "${FRONT_PORT:-5175}:5175"
     environment:
-      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://host.docker.internal:8050}
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:?Définir VITE_PROXY_TARGET dans .env}
     volumes:
       - .:/app
       - /app/node_modules
