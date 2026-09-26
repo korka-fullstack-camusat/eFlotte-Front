@@ -1,7 +1,12 @@
+import { useEffect, useState } from "react";
 import { NavLink, Link } from "react-router-dom";
+import axios from "axios";
 import { Home, History, UserRound, Car } from "lucide-react";
 import { Toaster } from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
+
+// Immatriculation du véhicule attribué, gardée entre les pages pour un affichage immédiat
+let plaqueEnCache: string | null | undefined;
 
 /** Mise en page de l'app chauffeur : pensée téléphone d'abord, centrée sur tablette / ordinateur. */
 export default function ChauffeurLayout({ children }: { children: React.ReactNode }) {
@@ -9,6 +14,12 @@ export default function ChauffeurLayout({ children }: { children: React.ReactNod
   const nom = user?.full_name || user?.username || "";
   const prenom = nom.split(" ")[0];
   const initiales = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(m => m[0]!.toUpperCase()).join("");
+  const [plaque, setPlaque] = useState(plaqueEnCache);
+  useEffect(() => {
+    axios.get("/api/auth/me")
+      .then(({ data }) => { plaqueEnCache = data.vehicule_plaque ?? null; setPlaque(plaqueEnCache); })
+      .catch(() => {});
+  }, []);
   const aujourdhui = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
   const onglet = ({ isActive }: { isActive: boolean }) =>
@@ -22,19 +33,29 @@ export default function ChauffeurLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-30 bg-camublue-900 text-white pt-[env(safe-area-inset-top)]">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shrink-0" aria-hidden>
-              <Car size={18} className="text-camublue-900" />
+            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shrink-0 text-camublue-900 text-lg font-black leading-none" aria-hidden>
+              e
             </div>
-            <p className="truncate text-base leading-none">
-              <span className="font-extrabold tracking-tight">eFlotte</span>
-              <span className="mx-1.5 text-white/40">—</span>
-              <span className="font-semibold tracking-[0.12em] text-white/85">CAMUSAT</span>
+            {/* Téléphone : sur deux lignes pour laisser la place à la plaque ; tablette et plus : sur une ligne */}
+            <p className="flex flex-col sm:flex-row sm:items-baseline leading-none">
+              <span className="text-base font-extrabold tracking-tight">eFlotte</span>
+              <span className="hidden sm:inline mx-1.5 text-white/40">—</span>
+              <span className="mt-0.5 sm:mt-0 text-[10px] sm:text-base font-semibold tracking-[0.2em] sm:tracking-[0.12em] text-white/75 sm:text-white/85">CAMUSAT</span>
             </p>
           </div>
-          <Link to="/app/profil" aria-label="Mon profil"
-            className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 ring-1 ring-white/25 flex items-center justify-center shrink-0 text-xs font-bold transition">
-            {initiales || <UserRound size={18} />}
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            {plaque && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-xs font-bold tracking-wide text-camublue-900 whitespace-nowrap"
+                title="Mon véhicule">
+                <Car size={14} aria-hidden />
+                <span className="sr-only">Mon véhicule : </span>{plaque}
+              </span>
+            )}
+            <Link to="/app/profil" aria-label="Mon profil"
+              className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 ring-1 ring-white/25 flex items-center justify-center shrink-0 text-xs font-bold transition">
+              {initiales || <UserRound size={18} />}
+            </Link>
+          </div>
         </div>
       </header>
 

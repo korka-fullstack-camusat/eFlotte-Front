@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, BellRing, Car, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { Plus, BellRing, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import ChauffeurLayout from "@/components/inspections/ChauffeurLayout";
 import NouveauRapportModal from "@/components/inspections/NouveauRapportModal";
 import RapportDetailModal from "@/components/inspections/RapportDetailModal";
@@ -52,25 +52,6 @@ export default function ChauffeurHomePage() {
               </div>
             </div>
           )}
-
-          <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-100 shadow-sm flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-camublue-900/10 flex items-center justify-center shrink-0">
-              <Car size={22} className="text-camublue-900" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500">Mon véhicule</p>
-              {espace.vehicule_plaque ? (
-                <p className="text-sm font-semibold text-gray-800 truncate">
-                  {espace.vehicule_plaque}
-                  {espace.vehicule && (espace.vehicule.marque || espace.vehicule.modele) && (
-                    <span className="font-normal text-gray-500"> · {[espace.vehicule.marque, espace.vehicule.modele].filter(Boolean).join(" ")}</span>
-                  )}
-                </p>
-              ) : (
-                <p className="text-sm text-gray-500">Aucun véhicule attribué</p>
-              )}
-            </div>
-          </div>
 
           <button onClick={() => setNouveau(true)}
             className="w-full min-h-[56px] rounded-2xl bg-camublue-900 hover:bg-camublue-900/90 text-white font-semibold shadow-sm inline-flex items-center justify-center gap-2 active:scale-[0.99] transition">
