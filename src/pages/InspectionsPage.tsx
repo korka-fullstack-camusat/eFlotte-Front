@@ -95,20 +95,30 @@ export default function InspectionsPage() {
   return (
     <AppLayout>
       <div className="mb-6 sticky top-0 z-20 bg-camugray-100 -mx-4 px-4 md:-mx-8 md:px-8 pt-1 pb-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
+        <div className="flex items-center justify-between flex-wrap xl:flex-nowrap gap-3">
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-camublue-900">Checklists chauffeurs</h1>
             <p className="text-gray-500 text-sm mt-0.5">
               Inspections et restitutions envoyées depuis l'application mobile
               {stats && <> · semaine du {formatDate(stats.semaine_debut)}</>}
             </p>
           </div>
-          {!isViewer && enRetard > 0 && (
-            <button onClick={() => setRelance({ cible: "retard", message: "" })}
-              className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-              <BellRing size={15} /><span>{enRetard > 1 ? `Relancer les ${enRetard} en retard` : "Relancer le chauffeur en retard"}</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap xl:flex-nowrap xl:shrink-0">
+            <div role="tablist" aria-label="Vue" className="inline-flex rounded-xl bg-white p-1 ring-1 ring-gray-100 shadow-sm">
+              {([["suivi", "Suivi de la semaine"], ["rapports", "Tous les rapports"]] as const).map(([k, l]) => (
+                <button key={k} role="tab" aria-selected={onglet === k} onClick={() => setOnglet(k)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${onglet === k ? "bg-camublue-900 text-white" : "text-gray-600 hover:text-camublue-900"}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            {!isViewer && enRetard > 0 && (
+              <button onClick={() => setRelance({ cible: "retard", message: "" })}
+                className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+                <BellRing size={15} /><span>{enRetard > 1 ? `Relancer les ${enRetard} en retard` : "Relancer le chauffeur en retard"}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -118,15 +128,6 @@ export default function InspectionsPage() {
         <KpiCard label="En retard" value={stats?.chauffeurs_en_retard ?? 0} icon={<Clock size={20} />} bg="bg-amber-100" text="text-amber-600" />
         <KpiCard label="Rapports cette semaine" value={stats?.rapports_semaine ?? 0} icon={<Smartphone size={20} />} bg="bg-violet-100" text="text-violet-600" />
         <KpiCard label="Avec point critique" value={stats?.rapports_critiques_semaine ?? 0} icon={<AlertTriangle size={20} />} bg="bg-red-100" text="text-red-600" />
-      </div>
-
-      <div role="tablist" aria-label="Vue" className="inline-flex rounded-xl bg-white p-1 ring-1 ring-gray-100 mb-4">
-        {([["suivi", "Suivi de la semaine"], ["rapports", "Tous les rapports"]] as const).map(([k, l]) => (
-          <button key={k} role="tab" aria-selected={onglet === k} onClick={() => setOnglet(k)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${onglet === k ? "bg-camublue-900 text-white" : "text-gray-600 hover:text-camublue-900"}`}>
-            {l}
-          </button>
-        ))}
       </div>
 
       {onglet === "suivi" ? (
