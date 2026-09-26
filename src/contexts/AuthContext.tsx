@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import axios from "axios";
 
-interface AuthUser {
+export interface AuthUser {
   username: string;
   full_name: string | null;
   role: string;
@@ -10,11 +10,12 @@ interface AuthUser {
 interface AuthContextType {
   user:     AuthUser | null;
   token:    string | null;
-  login:    (username: string, password: string) => Promise<void>;
+  login:    (username: string, password: string) => Promise<AuthUser>;
   logout:   () => void;
   loading:  boolean;
   isViewer: boolean;
   isAdmin:  boolean;
+  isChauffeur: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(authUser);
       localStorage.setItem(TOKEN_KEY, data.access_token);
       localStorage.setItem(USER_KEY, JSON.stringify(authUser));
+      return authUser;
     } finally {
       setLoading(false);
     }
@@ -78,9 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isViewer = user?.role === "VIEWER";
   const isAdmin  = user?.role === "ADMIN";
+  const isChauffeur = user?.role === "CHAUFFEUR";
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, isViewer, isAdmin }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, isViewer, isAdmin, isChauffeur }}>
       {children}
     </AuthContext.Provider>
   );

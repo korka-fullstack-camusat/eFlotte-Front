@@ -21,6 +21,7 @@ import {
   Car,
   Palette,
   Fuel,
+  Smartphone,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +45,7 @@ const isGroup = (e: NavEntry): e is NavGroup => "group" in e;
 
 const navEntries: NavEntry[] = [
   { label: "Tableau de bord", path: "/dashboard",     icon: <LayoutDashboard size={20} /> },
+  { label: "Checklists chauffeurs", path: "/inspections", icon: <Smartphone size={20} /> },
   {
     group: "Import / Export",
     icon: <UploadCloud size={20} />,

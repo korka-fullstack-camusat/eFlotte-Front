@@ -345,7 +345,7 @@ export const userService = {
     const { data } = await axios.get("/api/auth/users");
     return data;
   },
-  create: async (payload: { username: string; password: string; full_name?: string; email?: string; role: string }): Promise<UserAccount> => {
+  create: async (payload: { username: string; password: string; full_name?: string; email?: string; role: string; vehicule_plaque?: string }): Promise<UserAccount> => {
     const { data } = await axios.post("/api/auth/users", payload);
     return data;
   },

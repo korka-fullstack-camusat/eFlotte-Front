@@ -1,0 +1,12 @@
+{
+  "name": "P.A.R.C-CAM — Gestion de flotte",
+  "short_name": "P.A.R.C-CAM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fa",
+  "theme_color": "#003c71",
+  "lang": "fr",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

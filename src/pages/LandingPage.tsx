@@ -1,7 +1,12 @@
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { token, isChauffeur } = useAuth();
+
+  // Déjà connecté (ex. app ouverte depuis l'écran d'accueil du téléphone) : aller à son espace
+  if (token) return <Navigate to={isChauffeur ? "/app" : "/dashboard"} replace />;
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">

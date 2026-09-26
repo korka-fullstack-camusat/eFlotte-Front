@@ -5,8 +5,8 @@ import toast from "react-hot-toast";
 import AppLayout from "@/components/layout/AppLayout";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
-import { userService } from "@/services/api";
-import type { UserAccount } from "@/types";
+import { userService, vehiculeService } from "@/services/api";
+import type { UserAccount, Vehicule } from "@/types";
 
 
 const ROLE_LABELS: Record<string, string> = {
@@ -14,9 +14,10 @@ const ROLE_LABELS: Record<string, string> = {
   EDITOR: "Éditeur",
   HSE: "HSE",
   VIEWER: "Lecture seule",
+  CHAUFFEUR: "Chauffeur (app mobile)",
 };
 
-const EMPTY = { username: "", password: "", full_name: "", email: "", role: "EDITOR" };
+const EMPTY = { username: "", password: "", full_name: "", email: "", role: "EDITOR", vehicule_plaque: "" };
 
 export default function UsersPage() {
   const { isAdmin, user: currentUser } = useAuth();
@@ -27,6 +28,7 @@ export default function UsersPage() {
   const [form, setForm] = useState(EMPTY);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [vehicules, setVehicules] = useState<Vehicule[]>([]);
 
   const load = () => {
     setLoading(true);
@@ -34,6 +36,7 @@ export default function UsersPage() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { vehiculeService.getAll().then(setVehicules).catch(() => {}); }, []);
 
   const pageCount = Math.max(1, Math.ceil(users.length / pageSize));
   const pagedUsers = users.slice((page - 1) * pageSize, page * pageSize);
@@ -42,7 +45,7 @@ export default function UsersPage() {
   const openCreate = () => { setEditing(null); setForm(EMPTY); setModal(true); };
   const openEdit = (u: UserAccount) => {
     setEditing(u);
-    setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role });
+    setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role, vehicule_plaque: u.vehicule_plaque ?? "" });
     setModal(true);
   };
 
@@ -50,12 +53,15 @@ export default function UsersPage() {
     e.preventDefault();
     try {
       if (editing) {
-        const payload: any = { full_name: form.full_name, email: form.email, role: form.role };
+        const payload: any = {
+          full_name: form.full_name, email: form.email, role: form.role,
+          vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "",
+        };
         if (form.password) payload.password = form.password;
         await userService.update(editing.id, payload);
         toast.success("Utilisateur mis à jour");
       } else {
-        await userService.create(form);
+        await userService.create({ ...form, vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "" });
         toast.success("Utilisateur créé");
       }
       setModal(false);
@@ -115,7 +121,10 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-2.5 text-gray-600">{u.full_name || "—"}</td>
                     <td className="px-4 py-2.5 text-gray-600">{u.email || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600">{ROLE_LABELS[u.role] ?? u.role}</td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {ROLE_LABELS[u.role] ?? u.role}
+                      {u.role === "CHAUFFEUR" && u.vehicule_plaque && <span className="block text-xs text-gray-400">{u.vehicule_plaque}</span>}
+                    </td>
                     <td className="px-4 py-2.5 text-center">
                       {u.is_active
                         ? <span className="inline-flex items-center text-emerald-600 font-semibold text-xs">Actif</span>
@@ -183,8 +192,29 @@ export default function UsersPage() {
                   <option value="EDITOR">Éditeur</option>
                   <option value="HSE">HSE</option>
                   <option value="VIEWER">Lecture seule</option>
+                  <option value="CHAUFFEUR">Chauffeur (app mobile)</option>
                 </select>
+                {form.role === "CHAUFFEUR" && (
+                  <p className="mt-1 text-xs text-gray-500">Accès uniquement à l'application mobile de checklist véhicule.</p>
+                )}
               </div>
+              {form.role === "CHAUFFEUR" && (
+                <div>
+                  <label htmlFor="user-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Véhicule attribué</label>
+                  <select id="user-vehicule" value={form.vehicule_plaque}
+                    onChange={e => setForm(f => ({ ...f, vehicule_plaque: e.target.value }))} className="input-base">
+                    <option value="">Aucun (le chauffeur choisira à chaque rapport)</option>
+                    {form.vehicule_plaque && !vehicules.some(v => v.plaque_immatriculation === form.vehicule_plaque) && (
+                      <option value={form.vehicule_plaque}>{form.vehicule_plaque}</option>
+                    )}
+                    {vehicules.map(v => (
+                      <option key={v.id} value={v.plaque_immatriculation}>
+                        {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                   {editing ? "Nouveau mot de passe (optionnel)" : "Mot de passe *"}

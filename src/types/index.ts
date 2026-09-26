@@ -378,4 +378,130 @@ export interface UserAccount {
   email: string | null;
   is_active: boolean;
   role: string;
+  vehicule_plaque: string | null;
+}
+
+// ── Checklists mobiles (inspection / restitution) ────────────────────────────
+
+export type TypeReponse = "OUI_NON" | "NIVEAU" | "ETAT";
+
+export interface ChecklistModele {
+  types_reponse: Record<TypeReponse, { options: { valeur: string; libelle: string }[]; negative: string }>;
+  sections: {
+    cle: string;
+    titre: string;
+    question: string;
+    type: TypeReponse;
+    items: { cle: string; libelle: string; critique: boolean }[];
+  }[];
+  photos: { position: string; libelle: string }[];
+  types_rapport: { valeur: string; libelle: string }[];
+}
+
+export interface ReponseItem {
+  valeur: string;
+  commentaire?: string | null;
+}
+
+export interface ReponsesRapport {
+  items: Record<string, ReponseItem>;
+  autres: Record<string, string>;
+}
+
+export interface RapportResume {
+  id: number;
+  user_id: number | null;
+  type_rapport: string;
+  date_rapport: string;
+  immatriculation: string;
+  marque: string | null;
+  modele: string | null;
+  nom_chauffeur: string;
+  kilometrage: number;
+  nb_non_conformes: number;
+  nb_critiques: number;
+  created_at: string;
+}
+
+export interface RapportDetail extends RapportResume {
+  filiale: string | null;
+  visite_technique: string | null;
+  reponses: ReponsesRapport;
+  commentaires: string | null;
+  nom_instructeur: string | null;
+  signature: string | null;
+  photos: string[];
+}
+
+export interface RapportPage {
+  items: RapportResume[];
+  total: number;
+}
+
+export interface VehiculeMini {
+  plaque_immatriculation: string;
+  marque: string | null;
+  modele: string | null;
+}
+
+export interface RelanceChecklist {
+  id: number;
+  envoye_par: string | null;
+  message: string | null;
+  created_at: string;
+}
+
+export interface MonEspace {
+  username: string;
+  full_name: string | null;
+  vehicule: VehiculeMini | null;
+  vehicule_plaque: string | null;
+  envoye_cette_semaine: boolean;
+  dernier_rapport: RapportResume | null;
+  derniers_rapports: RapportResume[];
+  relances: RelanceChecklist[];
+  filiale_precedente: string | null;
+}
+
+export interface SuiviChauffeur {
+  user_id: number;
+  username: string;
+  full_name: string | null;
+  vehicule_plaque: string | null;
+  envoye_cette_semaine: boolean;
+  dernier_rapport_id: number | null;
+  dernier_rapport_date: string | null;
+  dernier_rapport_critiques: number | null;
+  nb_rapports: number;
+  relances_en_attente: number;
+  derniere_relance: string | null;
+}
+
+export interface StatsInspections {
+  semaine_debut: string;
+  nb_chauffeurs: number;
+  chauffeurs_a_jour: number;
+  chauffeurs_en_retard: number;
+  rapports_semaine: number;
+  rapports_critiques_semaine: number;
+}
+
+export interface RapportsFilters {
+  q?: string;
+  statut?: "conforme" | "anomalies" | "critique" | "";
+  type_rapport?: string;
+  date_debut?: string;
+  date_fin?: string;
+}
+
+export interface NouveauRapportPayload {
+  type_rapport: string;
+  immatriculation: string;
+  kilometrage: number;
+  filiale: string;
+  visite_technique: string | null;
+  reponses: ReponsesRapport;
+  commentaires: string;
+  nom_instructeur: string;
+  signature: string;
 }

@@ -17,8 +17,8 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     try {
-      await login(username, password);
-      navigate("/dashboard");
+      const u = await login(username, password);
+      navigate(u.role === "CHAUFFEUR" ? "/app" : "/dashboard");
     } catch (err: any) {
       console.error("Erreur de connexion :", err);
       let msg: string;
