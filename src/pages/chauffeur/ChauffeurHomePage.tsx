@@ -7,6 +7,7 @@ import RapportDetailModal from "@/components/inspections/RapportDetailModal";
 import RapportCarte from "@/components/inspections/RapportCarte";
 import { formatDate } from "@/components/inspections/utils";
 import { inspectionService } from "@/services/inspections";
+import { useAuth } from "@/contexts/AuthContext";
 import type { MonEspace } from "@/types";
 
 export default function ChauffeurHomePage() {
@@ -14,6 +15,9 @@ export default function ChauffeurHomePage() {
   const [erreur, setErreur] = useState(false);
   const [nouveau, setNouveau] = useState(false);
   const [detail, setDetail] = useState<number | null>(null);
+  const { user } = useAuth();
+  const prenom = (user?.full_name || user?.username || "").split(" ")[0];
+  const aujourdhui = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
   const charger = useCallback(() => {
     setErreur(false);
@@ -23,6 +27,13 @@ export default function ChauffeurHomePage() {
 
   return (
     <ChauffeurLayout>
+      <section className="mb-5">
+        <h1 className="text-2xl font-bold text-camublue-900">
+          Bonjour {prenom} <span role="img" aria-label="salutation" className="inline-block origin-[70%_70%] animate-[wave_1.6s_ease-in-out_1] motion-reduce:animate-none">👋</span>
+        </h1>
+        <p className="text-sm text-gray-500 first-letter:uppercase">{aujourdhui}</p>
+      </section>
+
       {erreur ? (
         <div className="text-center py-16">
           <p className="text-sm text-gray-600 mb-4">Impossible de charger votre espace. Vérifiez votre connexion.</p>
@@ -34,7 +45,6 @@ export default function ChauffeurHomePage() {
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-camublue-900" aria-label="Chargement" /></div>
       ) : (
         <div className="space-y-5">
-          <h1 className="sr-only">Accueil</h1>
 
           {espace.relances.length > 0 && !espace.envoye_cette_semaine && (
             <div role="alert" className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 p-4 flex gap-3">

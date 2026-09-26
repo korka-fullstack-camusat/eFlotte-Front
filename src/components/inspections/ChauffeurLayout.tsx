@@ -12,7 +12,6 @@ let plaqueEnCache: string | null | undefined;
 export default function ChauffeurLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const nom = user?.full_name || user?.username || "";
-  const prenom = nom.split(" ")[0];
   const initiales = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(m => m[0]!.toUpperCase()).join("");
   const [plaque, setPlaque] = useState(plaqueEnCache);
   useEffect(() => {
@@ -20,7 +19,6 @@ export default function ChauffeurLayout({ children }: { children: React.ReactNod
       .then(({ data }) => { plaqueEnCache = data.vehicule_plaque ?? null; setPlaque(plaqueEnCache); })
       .catch(() => {});
   }, []);
-  const aujourdhui = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
   const onglet = ({ isActive }: { isActive: boolean }) =>
     `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-xs font-semibold transition ${
@@ -58,16 +56,6 @@ export default function ChauffeurLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-
-      {/* Salutation */}
-      <div className="bg-camublue-900 text-white rounded-b-3xl shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
-          <p className="text-2xl font-bold truncate">
-            Bonjour {prenom} <span role="img" aria-label="salutation" className="inline-block origin-[70%_70%] animate-[wave_1.6s_ease-in-out_1] motion-reduce:animate-none">👋</span>
-          </p>
-          <p className="text-sm text-white/70 first-letter:uppercase">{aujourdhui}</p>
-        </div>
-      </div>
 
       <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-5 pb-28">{children}</main>
 
