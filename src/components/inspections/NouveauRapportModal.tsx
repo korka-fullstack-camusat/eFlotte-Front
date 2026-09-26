@@ -150,10 +150,12 @@ export default function NouveauRapportModal({
     if (cle === "infos") {
       const out: string[] = [];
       if (!immatriculation) out.push("véhicule");
-      if (kilometrage === "" || !/^\d+$/.test(kilometrage)) out.push("kilométrage");
       return out;
     }
-    if (cle === "photos") return m.photos.filter(p => !photos[p.position]).map(p => p.libelle);
+    if (cle === "photos") {
+      const out = kilometrage === "" || !/^\d+$/.test(kilometrage) ? ["kilométrage"] : [];
+      return [...out, ...m.photos.filter(p => !photos[p.position]).map(p => p.libelle)];
+    }
     if (cle === "validation") return signature ? [] : ["signature"];
     const s = m.sections.find(x => x.cle === cle);
     return s ? s.items.filter(i => !items[i.cle]?.valeur).map(i => i.libelle) : [];
@@ -346,19 +348,6 @@ export default function NouveauRapportModal({
                 </div>
               )}
 
-              <div>
-                <label htmlFor="rap-km" className="block text-xs font-semibold text-gray-600 mb-1.5">Kilométrage au compteur (km) *</label>
-                <input id="rap-km" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
-                  value={kilometrage} onChange={e => setKilometrage(e.target.value.replace(/\D/g, ""))}
-                  placeholder={vehicule?.kilometrage != null ? `Dernier relevé : ${vehicule.kilometrage.toLocaleString("fr-FR")}` : "ex : 45230"}
-                  aria-describedby="rap-km-aide" className="input-base min-h-[44px] bg-white" />
-                <p id="rap-km-aide" className={`mt-1 text-xs ${kmBas ? "text-amber-700" : "text-gray-400"}`}>
-                  {kmBas
-                    ? `Inférieur au dernier relevé (${vehicule!.kilometrage!.toLocaleString("fr-FR")} km) : vérifiez le compteur.`
-                    : vehicule?.kilometrage != null ? `Dernier relevé : ${vehicule.kilometrage.toLocaleString("fr-FR")} km` : "\u00a0"}
-                </p>
-              </div>
-
               {/* Visite technique : demandée seulement si inconnue ou dépassée */}
               {vtConnue ? (
                 <p className="text-xs text-gray-500">
@@ -416,6 +405,18 @@ export default function NouveauRapportModal({
             </div>
           ) : etapes[etape].cle === "photos" ? (
             <div>
+              <div className="mb-4">
+                <label htmlFor="rap-km" className="block text-xs font-semibold text-gray-600 mb-1.5">Kilométrage au compteur (km) *</label>
+                <input id="rap-km" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
+                  value={kilometrage} onChange={e => setKilometrage(e.target.value.replace(/\D/g, ""))}
+                  placeholder={vehicule?.kilometrage != null ? `Dernier relevé : ${vehicule.kilometrage.toLocaleString("fr-FR")}` : "ex : 45230"}
+                  aria-describedby="rap-km-aide" className="input-base min-h-[44px] bg-white" />
+                <p id="rap-km-aide" className={`mt-1 text-xs ${kmBas ? "text-amber-700" : "text-gray-400"}`}>
+                  {kmBas
+                    ? `Inférieur au dernier relevé (${vehicule!.kilometrage!.toLocaleString("fr-FR")} km) : vérifiez le compteur.`
+                    : vehicule?.kilometrage != null ? `Dernier relevé : ${vehicule.kilometrage.toLocaleString("fr-FR")} km` : "\u00a0"}
+                </p>
+              </div>
               <p className="text-sm text-gray-600 mb-3">Prenez les 6 photos du véhicule. Touchez une case pour ouvrir l'appareil photo.</p>
               <input ref={inputPhoto} type="file" accept="image/*" capture="environment" className="hidden" onChange={surPhoto} tabIndex={-1} aria-hidden />
               <div className="grid grid-cols-2 gap-3">
