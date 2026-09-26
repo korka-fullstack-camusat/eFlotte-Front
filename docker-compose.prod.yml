@@ -1,0 +1,23 @@
+# Front eFlotte — PRODUCTION (EC2)
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Lancer d'abord le backend (eFlotte-Api/docker-compose.prod.yml) : il crée le
+# réseau « eflotte » et le Caddy qui sert ce front sur les ports 80/443.
+# Aucun port n'est ouvert ici : tout passe par Caddy.
+
+name: eflotte-front
+
+services:
+  front:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: eflotte-front
+    restart: unless-stopped
+    networks: [eflotte]
+
+networks:
+  eflotte:
+    external: true
+    name: eflotte
