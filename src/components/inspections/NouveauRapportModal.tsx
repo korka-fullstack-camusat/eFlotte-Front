@@ -94,7 +94,6 @@ export default function NouveauRapportModal({
   const [typeRapport, setTypeRapport] = useState(brouillon?.type_rapport ?? "INSPECTION");
   // Véhicule du compte : jamais redemandé. Choisi une seule fois s'il n'est pas encore attribué.
   const [immatriculation, setImmatriculation] = useState(espace.vehicule_plaque ?? brouillon?.immatriculation ?? "");
-  const [filiale, setFiliale] = useState(espace.filiale ?? "");
   const [kilometrage, setKilometrage] = useState(brouillon?.kilometrage ?? "");
   const [visiteTechnique, setVisiteTechnique] = useState(brouillon?.visite_technique ?? "");
   const [items, setItems] = useState<Record<string, ReponseItem>>(brouillon?.items ?? {});
@@ -146,7 +145,6 @@ export default function NouveauRapportModal({
   const vtConnue = vehicule?.visite_technique && vehicule.visite_technique >= aujourdhui ? vehicule.visite_technique : null;
   const kmBas = vehicule?.kilometrage != null && kilometrage !== "" && Number(kilometrage) < vehicule.kilometrage;
   const choixVehicule = !espace.vehicule_plaque;
-  const choixFiliale = !espace.filiale;
 
   const section = modele?.sections.find(s => s.cle === etapes[etape]?.cle);
   const derniere = etape === etapes.length - 1;
@@ -156,7 +154,6 @@ export default function NouveauRapportModal({
     if (cle === "infos") {
       const out: string[] = [];
       if (!immatriculation) out.push("véhicule");
-      if (choixFiliale && !filiale.trim()) out.push("filiale");
       if (kilometrage === "" || !/^\d+$/.test(kilometrage)) out.push("kilométrage");
       return out;
     }
@@ -240,7 +237,6 @@ export default function NouveauRapportModal({
         {
           type_rapport: typeRapport,
           immatriculation,
-          ...(choixFiliale ? { filiale: filiale.trim() } : {}),
           kilometrage: Number(kilometrage),
           visite_technique: vtConnue ? null : visiteTechnique || null,
           reponses: { items, autres },
@@ -333,32 +329,23 @@ export default function NouveauRapportModal({
               </div>
 
               {/* Premier rapport seulement : ce qui manque au compte, enregistré pour la suite */}
-              {(choixVehicule || choixFiliale) && (
+              {choixVehicule && (
                 <div className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 p-3 space-y-3">
                   <p className="text-xs text-amber-800">
-                    À renseigner une seule fois : ce sera enregistré sur votre compte pour les prochains rapports.
+                    Aucun véhicule ne vous est encore attribué : choisissez-le une seule fois, il sera enregistré sur votre compte.
                   </p>
-                  {choixVehicule && (
-                    <div>
-                      <label htmlFor="rap-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Votre véhicule *</label>
-                      <select id="rap-vehicule" value={immatriculation} onChange={e => setImmatriculation(e.target.value)}
-                        className="input-base min-h-[44px] bg-white" disabled={!vehicules}>
-                        <option value="">{vehicules ? "Choisir le véhicule" : "Chargement…"}</option>
-                        {vehicules?.map(v => (
-                          <option key={v.plaque_immatriculation} value={v.plaque_immatriculation}>
-                            {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {choixFiliale && (
-                    <div>
-                      <label htmlFor="rap-filiale" className="block text-xs font-semibold text-gray-600 mb-1.5">Votre filiale *</label>
-                      <input id="rap-filiale" type="text" value={filiale} onChange={e => setFiliale(e.target.value)}
-                        placeholder="ex : Camusat Sénégal" className="input-base min-h-[44px] bg-white" />
-                    </div>
-                  )}
+                  <div>
+                    <label htmlFor="rap-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Votre véhicule *</label>
+                    <select id="rap-vehicule" value={immatriculation} onChange={e => setImmatriculation(e.target.value)}
+                      className="input-base min-h-[44px] bg-white" disabled={!vehicules}>
+                      <option value="">{vehicules ? "Choisir le véhicule" : "Chargement…"}</option>
+                      {vehicules?.map(v => (
+                        <option key={v.plaque_immatriculation} value={v.plaque_immatriculation}>
+                          {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 

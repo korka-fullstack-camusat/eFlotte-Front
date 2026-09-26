@@ -505,8 +505,6 @@ export interface NouveauRapportPayload {
   type_rapport: string;
   immatriculation: string;
   kilometrage: number;
-  /** Envoyés seulement au premier rapport, quand le compte ne les a pas encore */
-  filiale?: string;
   visite_technique: string | null;
   reponses: ReponsesRapport;
   commentaires: string;

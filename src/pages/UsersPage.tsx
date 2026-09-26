@@ -219,8 +219,8 @@ export default function UsersPage() {
               )}
               {form.role === "CHAUFFEUR" && (
                 <div>
-                  <label htmlFor="user-filiale" className="block text-xs font-semibold text-gray-600 mb-1.5">Filiale</label>
-                  <input id="user-filiale" type="text" value={form.filiale} placeholder="ex : Camusat Sénégal"
+                  <label htmlFor="user-filiale" className="block text-xs font-semibold text-gray-600 mb-1.5">Filiale *</label>
+                  <input id="user-filiale" type="text" value={form.filiale} placeholder="ex : Camusat Sénégal" required
                     onChange={e => setForm(f => ({ ...f, filiale: e.target.value }))} className="input-base" />
                   <p className="mt-1 text-xs text-gray-500">
                     Véhicule et filiale sont repris dans chaque rapport : le chauffeur n'a pas à les saisir.
