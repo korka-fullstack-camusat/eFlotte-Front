@@ -17,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     try {
-      const u = await login(username, password);
+      const u = await login(username.trim(), password);
       navigate(u.role === "CHAUFFEUR" ? "/app" : "/dashboard");
     } catch (err: any) {
       console.error("Erreur de connexion :", err);
@@ -56,6 +56,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
+                autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username"
                 placeholder="ex : admin"
                 required autoFocus
                 className="input-base"

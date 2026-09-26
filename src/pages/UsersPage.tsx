@@ -61,7 +61,7 @@ export default function UsersPage() {
         await userService.update(editing.id, payload);
         toast.success("Utilisateur mis à jour");
       } else {
-        await userService.create({ ...form, vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "" });
+        await userService.create({ ...form, username: form.username.trim(), vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "" });
         toast.success("Utilisateur créé");
       }
       setModal(false);
@@ -171,6 +171,7 @@ export default function UsersPage() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nom d'utilisateur *</label>
                 <input type="text" value={form.username} disabled={!!editing} required
                   onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   className="input-base disabled:opacity-60" />
               </div>
               <div>
