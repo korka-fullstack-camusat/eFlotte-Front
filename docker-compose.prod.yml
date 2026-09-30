@@ -5,6 +5,7 @@
 # Lancer d'abord le backend (eFlotte-Api/docker-compose.prod.yml) : il crée le
 # réseau « eflotte » et le Caddy qui sert ce front sur les ports 80/443.
 # Aucun port n'est ouvert ici : tout passe par Caddy.
+# Réglages dans .env (voir .env.example, section Production).
 
 name: eflotte-front
 
@@ -13,6 +14,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod
+      args:
+        # Vide = API sur la même adresse que le site (via Caddy). Voir .env
+        VITE_API_URL: ${VITE_API_URL:-}
     container_name: eflotte-front
     restart: unless-stopped
     networks: [eflotte]
