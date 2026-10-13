@@ -380,6 +380,9 @@ export interface UserAccount {
   role: string;
   vehicule_plaque: string | null;
   filiale: string | null;
+  telephone: string | null;
+  doit_changer_mdp: boolean;
+  identifiants_envoyes_at: string | null;
 }
 
 // ── Checklists mobiles (inspection / restitution) ────────────────────────────
@@ -509,4 +512,35 @@ export interface NouveauRapportPayload {
   commentaires: string;
   nom_instructeur: string;
   signature: string;
+}
+
+// ── Import en masse des comptes chauffeurs ──────────────────────────────────
+
+export interface LigneImportChauffeur {
+  ligne: number;
+  nom: string | null;
+  username: string | null;
+  telephone: string | null;
+  statut: "CREE" | "IGNORE" | "ERREUR";
+  message: string | null;
+  sms: "ENVOYE" | "ECHEC" | "NON_CONFIGURE" | "SANS_NUMERO" | null;
+  user_id: number | null;
+}
+
+export interface ResultatImportChauffeurs {
+  crees: number;
+  ignores: number;
+  erreurs: number;
+  sms_envoyes: number;
+  sms_echecs: number;
+  sms_actif: boolean;
+  mot_de_passe_initial: string;
+  app_url: string;
+  lignes: LigneImportChauffeur[];
+}
+
+export interface StatutSms {
+  actif: boolean;
+  app_url: string;
+  mot_de_passe_initial: string;
 }

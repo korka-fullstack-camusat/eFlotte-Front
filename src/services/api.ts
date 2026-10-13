@@ -14,6 +14,7 @@ import type {
   SuiviPanne, SuiviPannePage, FiltresSuiviPanne, PannesFilters, ImportSuiviPanneResult,
   Pneumatique, PneumatiquePage, FiltresPneumatiques, PneumatiquesFilters, ImportPneumatiqueResult,
   SuiviSinistre, SuiviSinistrePage, SinistresFilters, ImportSinistreResult,
+  ResultatImportChauffeurs, StatutSms,
 } from "@/types";
 
 
@@ -356,4 +357,25 @@ export const userService = {
   remove: async (id: number): Promise<void> => {
     await axios.delete(`/api/auth/users/${id}`);
   },
+};
+
+export const chauffeurComptesService = {
+  /** Télécharge le modèle Excel d'import */
+  modele: async (): Promise<void> => {
+    const { data } = await axios.get("/api/auth/chauffeurs/modele", { responseType: "blob" });
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url; a.download = "modele_import_chauffeurs.xlsx"; a.click();
+    URL.revokeObjectURL(url);
+  },
+  importer: async (file: File, filiale_defaut: string, envoyer: boolean): Promise<ResultatImportChauffeurs> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("filiale_defaut", filiale_defaut);
+    form.append("envoyer", String(envoyer));
+    return (await axios.post("/api/auth/chauffeurs/import", form, { timeout: 0 })).data;
+  },
+  envoyerIdentifiants: async (id: number): Promise<{ username: string; telephone: string | null; mot_de_passe_initial: string; sms: string; message: string | null }> =>
+    (await axios.post(`/api/auth/chauffeurs/${id}/identifiants`)).data,
+  statutSms: async (): Promise<StatutSms> => (await axios.get("/api/auth/chauffeurs/sms")).data,
 };

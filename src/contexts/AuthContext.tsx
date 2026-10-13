@@ -5,6 +5,8 @@ export interface AuthUser {
   username: string;
   full_name: string | null;
   role: string;
+  /** Mot de passe initial commun (compte importé) : à changer avant tout */
+  doit_changer_mdp?: boolean;
 }
 
 interface AuthContextType {
@@ -12,6 +14,7 @@ interface AuthContextType {
   token:    string | null;
   login:    (username: string, password: string) => Promise<AuthUser>;
   logout:   () => void;
+  motDePasseChange: () => void;
   loading:  boolean;
   isViewer: boolean;
   isAdmin:  boolean;
@@ -58,7 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
 
-      const authUser: AuthUser = { username: data.username, full_name: data.full_name, role: data.role ?? "EDITOR" };
+      const authUser: AuthUser = {
+        username: data.username, full_name: data.full_name, role: data.role ?? "EDITOR",
+        doit_changer_mdp: !!data.doit_changer_mdp,
+      };
       setAuthHeader(data.access_token);
       setToken(data.access_token);
       setUser(authUser);
@@ -68,6 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const motDePasseChange = () => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const maj = { ...prev, doit_changer_mdp: false };
+      localStorage.setItem(USER_KEY, JSON.stringify(maj));
+      return maj;
+    });
   };
 
   const logout = () => {
@@ -83,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isChauffeur = user?.role === "CHAUFFEUR";
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, isViewer, isAdmin, isChauffeur }}>
+    <AuthContext.Provider value={{ user, token, login, logout, motDePasseChange, loading, isViewer, isAdmin, isChauffeur }}>
       {children}
     </AuthContext.Provider>
   );

@@ -23,6 +23,7 @@ const InspectionsPage    = lazy(() => import("@/pages/InspectionsPage"));
 const ChauffeurHomePage       = lazy(() => import("@/pages/chauffeur/ChauffeurHomePage"));
 const ChauffeurHistoriquePage = lazy(() => import("@/pages/chauffeur/ChauffeurHistoriquePage"));
 const ChauffeurProfilPage     = lazy(() => import("@/pages/chauffeur/ChauffeurProfilPage"));
+const PremiereConnexionPage   = lazy(() => import("@/pages/PremiereConnexionPage"));
 
 function PageLoader() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/premiere-connexion" element={<PremiereConnexionPage />} />
 
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/data-flottes" element={<ProtectedRoute><DataFlottesPage /></ProtectedRoute>} />

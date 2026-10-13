@@ -18,7 +18,9 @@ export default function LoginPage() {
     setError("");
     try {
       const u = await login(username.trim(), password);
-      navigate(u.role === "CHAUFFEUR" ? "/app" : "/dashboard");
+      // Le mot de passe saisi est gardé en mémoire (état de navigation) pour ne pas le redemander
+      if (u.doit_changer_mdp) navigate("/premiere-connexion", { state: { ancien: password } });
+      else navigate(u.role === "CHAUFFEUR" ? "/app" : "/dashboard");
     } catch (err: any) {
       console.error("Erreur de connexion :", err);
       let msg: string;

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, X, Users as UsersIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Users as UsersIcon, FileSpreadsheet, MessageSquare, Search, KeyRound } from "lucide-react";
 import toast from "react-hot-toast";
 import AppLayout from "@/components/layout/AppLayout";
 import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
-import { userService, vehiculeService } from "@/services/api";
+import { userService, vehiculeService, chauffeurComptesService } from "@/services/api";
+import ImportChauffeursModal from "@/components/users/ImportChauffeursModal";
 import type { UserAccount, Vehicule } from "@/types";
 
 
@@ -17,7 +18,7 @@ const ROLE_LABELS: Record<string, string> = {
   CHAUFFEUR: "Chauffeur (app mobile)",
 };
 
-const EMPTY = { username: "", password: "", full_name: "", email: "", role: "EDITOR", vehicule_plaque: "", filiale: "" };
+const EMPTY = { username: "", password: "", full_name: "", email: "", role: "EDITOR", vehicule_plaque: "", filiale: "", telephone: "" };
 
 export default function UsersPage() {
   const { isAdmin, user: currentUser } = useAuth();
@@ -29,6 +30,9 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
+  const [importOuvert, setImportOuvert] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  const [filtreRole, setFiltreRole] = useState("");
 
   const load = () => {
     setLoading(true);
@@ -38,14 +42,18 @@ export default function UsersPage() {
   useEffect(() => { load(); }, []);
   useEffect(() => { vehiculeService.getAll().then(setVehicules).catch(() => {}); }, []);
 
-  const pageCount = Math.max(1, Math.ceil(users.length / pageSize));
-  const pagedUsers = users.slice((page - 1) * pageSize, page * pageSize);
+  const q = recherche.trim().toLowerCase();
+  const filtres = users.filter(u =>
+    (!filtreRole || u.role === filtreRole) &&
+    (!q || [u.username, u.full_name, u.telephone, u.vehicule_plaque].some(v => v?.toLowerCase().includes(q))));
+  const pageCount = Math.max(1, Math.ceil(filtres.length / pageSize));
+  const pagedUsers = filtres.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
 
   const openCreate = () => { setEditing(null); setForm(EMPTY); setModal(true); };
   const openEdit = (u: UserAccount) => {
     setEditing(u);
-    setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role, vehicule_plaque: u.vehicule_plaque ?? "", filiale: u.filiale ?? "" });
+    setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role, vehicule_plaque: u.vehicule_plaque ?? "", filiale: u.filiale ?? "", telephone: u.telephone ?? "" });
     setModal(true);
   };
 
@@ -57,6 +65,7 @@ export default function UsersPage() {
           full_name: form.full_name, email: form.email, role: form.role,
           vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "",
           filiale: form.role === "CHAUFFEUR" ? form.filiale : "",
+          telephone: form.telephone,
         };
         if (form.password) payload.password = form.password;
         await userService.update(editing.id, payload);
@@ -66,6 +75,18 @@ export default function UsersPage() {
         toast.success("Utilisateur créé");
       }
       setModal(false);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Erreur");
+    }
+  };
+
+  const envoyerIdentifiants = async (u: UserAccount) => {
+    if (!confirm(`Remettre le mot de passe initial de ${u.full_name || u.username} et lui envoyer ses identifiants par SMS${u.telephone ? ` (${u.telephone})` : ""} ?\n\nIl devra choisir un nouveau mot de passe à la connexion.`)) return;
+    try {
+      const r = await chauffeurComptesService.envoyerIdentifiants(u.id);
+      if (r.sms === "ENVOYE") toast.success(`Identifiants envoyés par SMS à ${r.telephone}`);
+      else toast(`Mot de passe remis à « ${r.mot_de_passe_initial} ». SMS non envoyé : ${r.message ?? r.sms}`, { icon: "⚠️", duration: 8000 });
       load();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Erreur");
@@ -92,10 +113,29 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-camublue-900">Comptes utilisateurs</h1>
           <p className="text-gray-500 text-sm mt-0.5">Gestion des accès à la plateforme</p>
         </div>
-        <button onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
-          <Plus size={15} /><span>Ajouter un utilisateur</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setImportOuvert(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-camublue-900 text-camublue-900 hover:bg-camublue-900/5 rounded-xl text-sm font-semibold transition">
+            <FileSpreadsheet size={15} /><span>Importer des chauffeurs</span>
+          </button>
+          <button onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl text-sm font-semibold transition shadow-sm">
+            <Plus size={15} /><span>Ajouter un utilisateur</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative w-full sm:w-80">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
+          <input type="search" value={recherche} onChange={e => { setRecherche(e.target.value); setPage(1); }}
+            placeholder="Nom, identifiant, téléphone ou plaque…" aria-label="Rechercher un compte" className="input-base pl-9 w-full bg-white" />
+        </div>
+        <select value={filtreRole} onChange={e => { setFiltreRole(e.target.value); setPage(1); }} aria-label="Rôle" className="input-base w-auto bg-white">
+          <option value="">Tous les rôles</option>
+          {Object.entries(ROLE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <span className="text-xs text-gray-500">{filtres.length} compte{filtres.length > 1 ? "s" : ""}</span>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
@@ -108,7 +148,7 @@ export default function UsersPage() {
                 <tr>
                   <th className="text-left px-4 py-2.5 font-semibold">Utilisateur</th>
                   <th className="text-left px-4 py-2.5 font-semibold">Nom complet</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Email</th>
+                  <th className="text-left px-4 py-2.5 font-semibold">Téléphone / Email</th>
                   <th className="text-left px-4 py-2.5 font-semibold">Rôle</th>
                   <th className="text-center px-4 py-2.5 font-semibold">Statut</th>
                   <th className="text-center px-4 py-2.5 font-semibold">Actions</th>
@@ -121,7 +161,10 @@ export default function UsersPage() {
                       <div className="flex items-center gap-1.5"><UsersIcon size={13} className="text-gray-400" />{u.username}</div>
                     </td>
                     <td className="px-4 py-2.5 text-gray-600">{u.full_name || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600">{u.email || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {u.telephone || (!u.email && "—")}
+                      {u.email && <span className={u.telephone ? "block text-xs text-gray-400" : ""}>{u.email}</span>}
+                    </td>
                     <td className="px-4 py-2.5 text-gray-600">
                       {ROLE_LABELS[u.role] ?? u.role}
                       {u.role === "CHAUFFEUR" && u.vehicule_plaque && <span className="block text-xs text-gray-400">{u.vehicule_plaque}</span>}
@@ -130,10 +173,22 @@ export default function UsersPage() {
                       {u.is_active
                         ? <span className="inline-flex items-center text-emerald-600 font-semibold text-xs">Actif</span>
                         : <span className="inline-flex items-center text-red-600 font-semibold text-xs">Désactivé</span>}
+                      {u.doit_changer_mdp && (
+                        <span className="mt-0.5 flex items-center justify-center gap-1 text-[11px] text-amber-600" title="Doit choisir son mot de passe à la prochaine connexion">
+                          <KeyRound size={11} /> 1re connexion
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => openEdit(u)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-camublue-900 transition">
+                        {u.role === "CHAUFFEUR" && (
+                          <button onClick={() => envoyerIdentifiants(u)} aria-label={`Envoyer les identifiants à ${u.username}`}
+                            title="Remettre le mot de passe initial et envoyer les identifiants par SMS"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-camublue-900 transition">
+                            <MessageSquare size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => openEdit(u)} aria-label={`Modifier ${u.username}`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-camublue-900 transition">
                           <Pencil size={14} />
                         </button>
                         {u.username !== currentUser?.username && (
@@ -152,7 +207,7 @@ export default function UsersPage() {
             </table>
           </div>
         )}
-        <Pagination page={page} pageSize={pageSize} total={users.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
+        <Pagination page={page} pageSize={pageSize} total={filtres.length} onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
       </div>
 
       {/* ══ Modal Ajout/Édition ════════════════════════════════════════════ */}
@@ -186,6 +241,13 @@ export default function UsersPage() {
                 <input type="email" value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   className="input-base" />
+              </div>
+              <div>
+                <label htmlFor="user-tel" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Téléphone {form.role === "CHAUFFEUR" && <span className="font-normal text-gray-400">(reçoit les identifiants par SMS)</span>}
+                </label>
+                <input id="user-tel" type="tel" value={form.telephone} placeholder="ex : 77 123 45 67"
+                  onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))} className="input-base" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Rôle</label>
@@ -248,6 +310,7 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+      {importOuvert && <ImportChauffeursModal onClose={() => setImportOuvert(false)} onImporte={load} />}
     </AppLayout>
   );
 }
