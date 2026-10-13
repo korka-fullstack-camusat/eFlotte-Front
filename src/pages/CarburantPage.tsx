@@ -23,6 +23,7 @@ interface CarburantRow {
   mois: number;
   annee: number;
   quantite_totale: number | null;
+  litres_estimes?: boolean;   // litres et type estimés depuis le coût HT (mois sans détail)
   montant_total: number | null;
   mt_ht: number | null;
   prix_unitaire: number | null;
@@ -320,6 +321,7 @@ export default function CarburantPage() {
   // Mois venant du « Suivi global des coûts » : coût HT et distance seulement (pas de litres ni de TTC)
   const couverture = useMemo(() => ({
     litres: rows.some(r => r.quantite_totale != null),
+    estimes: Math.round(rows.reduce((acc, r) => acc + (r.litres_estimes ? r.quantite_totale ?? 0 : 0), 0)),
     ttc:    rows.some(r => r.montant_total != null),
     ht:     Math.round(rows.reduce((acc, r) => acc + (r.mt_ht ?? 0), 0)),
   }), [rows]);
@@ -533,10 +535,13 @@ export default function CarburantPage() {
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard icon={<Fuel size={20} />} label="Total litres"
-              value={couverture.litres ? `${fmt(stats.total_litres, 0)} L` : "—"}
-              sub={couverture.litres
-                ? `Gazoil : ${fmt(stats.litres_gazoil, 0)} L · Essence : ${fmt(stats.litres_essence, 0)} L`
-                : "Non fourni pour ce mois"} />
+              value={couverture.litres ? `${couverture.estimes ? "≈ " : ""}${fmt(stats.total_litres, 0)} L` : "—"}
+              sub={!couverture.litres ? "Non fourni pour ce mois"
+                : couverture.estimes >= Math.round(stats.total_litres)
+                  ? "Estimé : coût HT ÷ prix au litre"
+                  : couverture.estimes
+                    ? `dont ≈ ${fmt(couverture.estimes, 0)} L estimés`
+                    : `Gazoil : ${fmt(stats.litres_gazoil, 0)} L · Essence : ${fmt(stats.litres_essence, 0)} L`} />
             {couverture.ttc || !couverture.ht ? (
               <KpiCard icon={<DollarSign size={20} />} label="Coût total"
                 value={`${fmt(stats.total_montant)} FCFA`}
@@ -618,7 +623,9 @@ export default function CarburantPage() {
                     </td>
                     <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{r.code_projet ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900"
-                      onClick={() => openQuickEdit(r, "quantite_totale")}>
+                      onClick={() => openQuickEdit(r, "quantite_totale")}
+                      title={r.litres_estimes ? "Estimé depuis le coût HT (prix au litre du fichier)" : undefined}>
+                      {r.litres_estimes && r.quantite_totale != null && <span className="text-gray-400" aria-label="estimé">≈ </span>}
                       {fmt(r.quantite_totale, 2)}
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums cursor-pointer hover:text-camublue-900"

@@ -13,7 +13,7 @@ interface VehiculeStats {
   immobilises: number; taux_disponibilite: number; essence: number; gasoil: number;
 }
 interface CarburantStats {
-  total_vehicules: number; total_litres: number; total_montant: number; total_montant_ht?: number;
+  total_vehicules: number; total_litres: number; litres_estimes?: number; total_montant: number; total_montant_ht?: number;
   total_distance: number; nb_gazoil: number; nb_essence: number;
   litres_gazoil: number; litres_essence: number;
   montant_gazoil: number; montant_essence: number;
@@ -153,6 +153,11 @@ export default function DashboardPage() {
     pts.filter(p => !moisFiltre || p.mois === moisFiltre).reduce((s, p) => s + p.total, 0);
   const coutMaintenanceTotal   = totalPeriode(evolutionMaint);
   const coutReparationTotal    = totalPeriode(evolutionRep);
+
+  // Litres estimés depuis le coût HT pour les mois sans détail carburant
+  const litresEstimes = carburantStats?.litres_estimes ?? 0;
+  const suffixeLitres = litresEstimes <= 0 ? ""
+    : litresEstimes >= (carburantStats?.total_litres ?? 0) - 0.5 ? " (estimé)" : " (dont estimés)";
 
   // Label période affiché dans les titres
   const periodeLabel = useMemo(() => {
@@ -319,15 +324,15 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 gap-3 flex-1">
                 <KpiCard label="Véhicules suivis"  value={carburantStats.total_vehicules}              icon={<Car size={18}/>}        bg="bg-camublue-900/10" text="text-camublue-900" />
                 {carburantStats.total_litres > 0 && (
-                <KpiCard label="Total litres"      value={Math.round(carburantStats.total_litres)}   suffix=" L" icon={<Droplets size={18}/>}   bg="bg-blue-50"         text="text-blue-700" />
+                <KpiCard label={`Total litres${suffixeLitres}`} value={Math.round(carburantStats.total_litres)}   suffix=" L" icon={<Droplets size={18}/>}   bg="bg-blue-50"         text="text-blue-700" />
                 )}
                 {/* HT : seul coût fourni pour tous les mois (les mois issus du récap des coûts n'ont pas de TTC) */}
                 <KpiCard label="Coût total HT (FCFA)" value={Math.round(carburantStats.total_montant_ht ?? 0)}  icon={<DollarSign size={18}/>} bg="bg-green-50"        text="text-green-700" />
                 <KpiCard label="Distance totale"   value={Math.round(carburantStats.total_distance)} suffix=" km" icon={<Route size={18}/>}    bg="bg-amber-50"        text="text-amber-700" />
                 {/* Litres absents pour les mois issus du récap des coûts : cartes masquées plutôt que « 0 L » */}
                 {carburantStats.total_litres > 0 && (<>
-                <KpiCard label="Gazoil (L)"        value={Math.round(carburantStats.litres_gazoil)}             icon={<Fuel size={18}/>}       bg="bg-camublue-900/10" text="text-camublue-900" />
-                <KpiCard label="Essence (L)"       value={Math.round(carburantStats.litres_essence)}            icon={<Fuel size={18}/>}       bg="bg-orange-50"       text="text-orange-600" />
+                <KpiCard label={`Gazoil (L)${suffixeLitres}`} value={Math.round(carburantStats.litres_gazoil)}             icon={<Fuel size={18}/>}       bg="bg-camublue-900/10" text="text-camublue-900" />
+                <KpiCard label={`Essence (L)${suffixeLitres}`} value={Math.round(carburantStats.litres_essence)}            icon={<Fuel size={18}/>}       bg="bg-orange-50"       text="text-orange-600" />
                 </>)}
               </div>
               <div className="lg:w-96 w-full shrink-0">
