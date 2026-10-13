@@ -212,13 +212,15 @@ export default function CarburantPage() {
       arr.reduce((acc, r) => acc + ((r[k] as number) || 0), 0);
     const top = (arr: CarburantRow[], key: keyof CarburantRow) =>
       [...arr].sort((a, b) => ((b[key] as number) || 0) - ((a[key] as number) || 0)).slice(0, 10);
+    // Un véhicule peut avoir une ligne GAZOIL et une ligne ESSENCE : on compte les matricules
+    const nbVehicules = (arr: CarburantRow[]) => new Set(arr.map(r => r.matricule)).size;
     setStats({
-      total_vehicules: data.length,
+      total_vehicules: nbVehicules(data),
       total_litres:    Math.round(sum(data, "quantite_totale") * 100) / 100,
       total_montant:   Math.round(sum(data, "montant_total")   * 100) / 100,
       total_distance:  Math.round(sum(data, "distance_totale") * 100) / 100,
-      nb_gazoil:       gazoil.length,
-      nb_essence:      essence.length,
+      nb_gazoil:       nbVehicules(gazoil),
+      nb_essence:      nbVehicules(essence),
       litres_gazoil:   Math.round(sum(gazoil,  "quantite_totale") * 100) / 100,
       litres_essence:  Math.round(sum(essence, "quantite_totale") * 100) / 100,
       montant_gazoil:  Math.round(sum(gazoil,  "montant_total")   * 100) / 100,
@@ -314,6 +316,7 @@ export default function CarburantPage() {
       (r.code_projet    ?? "").toLowerCase().includes(q)
     );
   }, [rows, search]);
+  const nbVehiculesAffiches = useMemo(() => new Set(filtered.map(r => r.matricule)).size, [filtered]);
   const totalPages  = Math.ceil(filtered.length / pageSize);
   const displayRows = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
@@ -458,7 +461,7 @@ export default function CarburantPage() {
           <div>
             <h1 className="text-2xl font-bold text-camublue-900">Suivi Carburant</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              {MOIS_NOMS[selectedMois - 1]} {selectedAnnee} — {filtered.length} véhicule{filtered.length !== 1 ? "s" : ""}
+              {MOIS_NOMS[selectedMois - 1]} {selectedAnnee} — {nbVehiculesAffiches} véhicule{nbVehiculesAffiches !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
