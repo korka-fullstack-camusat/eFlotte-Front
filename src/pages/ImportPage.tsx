@@ -4,10 +4,11 @@ import {
   Car, DollarSign, Navigation, FileText, ClipboardCheck, Wrench,
   AlertOctagon, CircleDot, X,
   ShieldAlert, LayoutGrid, ChevronRight as ChevronRightIcon, History,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, CalendarDays,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
+import { useAnnee, anneesImport } from "@/contexts/AnneeContext";
 import AppLayout from "@/components/layout/AppLayout";
 
 interface SectionResult {
@@ -50,6 +51,8 @@ function fmtDate(iso: string) {
 }
 
 export default function ImportPage() {
+  const { annee, annees, rafraichirAnnees } = useAnnee();
+  const [anneeFichier, setAnneeFichier] = useState(annee);
   const [mode, setMode]     = useState<ImportMode>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -79,6 +82,7 @@ export default function ImportPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("annee", String(anneeFichier));
       if (mode === "sinistres") {
         const { data } = await axios.post("/api/sinistres/import", formData, { headers: { "Content-Type": "multipart/form-data" } });
         setSinistreResult(data);
@@ -91,6 +95,7 @@ export default function ImportPage() {
         const { data } = await axios.post<ImportResult>("/api/import-global", formData, { headers: { "Content-Type": "multipart/form-data" } });
         setResult(data);
         setStatus("done");
+        rafraichirAnnees();
         const total = Object.values(data).reduce((s, r) => s + r.created + r.updated, 0);
         const errors = Object.values(data).reduce((s, r) => s + r.errors.length, 0);
         if (errors > 0) toast(`Import terminé : ${total} enregistrements — ${errors} ligne(s) ignorée(s)`, { icon: "⚠️" });
@@ -119,6 +124,18 @@ export default function ImportPage() {
           <h1 className="text-2xl font-bold text-camublue-900">Import en masse</h1>
           <p className="text-gray-500 text-sm mt-0.5">
             Uploadez le fichier Excel du tableau de bord pour alimenter automatiquement toutes les rubriques
+          </p>
+        </div>
+
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-4">
+          <CalendarDays size={20} className="text-camublue-900 shrink-0" aria-hidden />
+          <label htmlFor="annee-fichier" className="text-sm font-semibold text-gray-700">Année du fichier</label>
+          <select id="annee-fichier" value={anneeFichier} onChange={e => setAnneeFichier(Number(e.target.value))}
+            disabled={status === "loading"} className="input-base w-auto font-semibold">
+            {anneesImport(annees).map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <p className="text-xs text-gray-500 basis-full sm:basis-auto sm:flex-1">
+            Le fichier est considéré comme annuel : les données {anneeFichier} des rubriques présentes dans le fichier sont remplacées. Les autres années ne sont pas touchées.
           </p>
         </div>
 

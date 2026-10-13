@@ -22,10 +22,12 @@ import {
   Palette,
   Fuel,
   Smartphone,
+  CalendarDays,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAnnee } from "@/contexts/AnneeContext";
 
 type NavItem = {
   label: string;
@@ -140,6 +142,24 @@ function NavGroupComp({ group, onClose }: { group: NavGroup; onClose?: () => voi
   );
 }
 
+/** Année consultée : toutes les données de la plateforme sont filtrées sur cette année. */
+function SelecteurAnnee() {
+  const { annee, annees, setAnnee } = useAnnee();
+  const id = useId();   // le menu existe en version ordinateur et mobile
+  return (
+    <div className="px-4 pt-4">
+      <label htmlFor={id} className="flex items-center gap-2 rounded-xl bg-camublue-900/5 px-4 py-2.5 text-sm font-semibold text-camublue-900">
+        <CalendarDays size={18} className="shrink-0" aria-hidden />
+        <span className="flex-1">Année</span>
+        <select id={id} data-testid="annee-globale" value={annee} onChange={e => setAnnee(Number(e.target.value))}
+          className="rounded-lg border border-camublue-900/20 bg-white px-2 py-1 text-sm font-bold text-camublue-900 focus:outline-none focus:ring-2 focus:ring-camublue-900/30">
+          {annees.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </label>
+    </div>
+  );
+}
+
 const PRESET_COLORS = ["#003c71", "#0f766e", "#7c2d12", "#4c1d95", "#831843", "#14532d", "#1e293b"];
 
 function ThemePicker() {
@@ -226,6 +246,7 @@ export default function Sidebar() {
 
   const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
     <>
+      <SelecteurAnnee />
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         {entries.map((entry, i) =>
           isGroup(entry)

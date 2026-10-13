@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, Tooltip as RTooltip,
 } from "recharts";
 import toast from "react-hot-toast";
+import { useAnnee } from "@/contexts/AnneeContext";
 import AppLayout from "@/components/layout/AppLayout";
 import ChartFilterBar, {
   ChartFilter, CHART_FILTER_EMPTY, applyChartFilter,
@@ -160,8 +161,10 @@ const THIS_YEAR = new Date().getFullYear();
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CarburantPage() {
+  const { annee: anneeConsultee } = useAnnee();
   const [selectedMois,  setSelectedMois]  = useState<number>(new Date().getMonth() + 1);
-  const [selectedAnnee, setSelectedAnnee] = useState<number>(THIS_YEAR);
+  // L'année suit le sélecteur « Année » du menu (la page est rechargée quand il change)
+  const [selectedAnnee, setSelectedAnnee] = useState<number>(anneeConsultee);
 
   const [rows,    setRows]    = useState<CarburantRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -347,7 +350,7 @@ export default function CarburantPage() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const { data } = await axios.post(`/api/carburant/import?mois=${importMois}&annee=${selectedAnnee}`, fd);
+      const { data } = await axios.post(`/api/carburant/import?mois=${importMois}&annee=${anneeConsultee}`, fd);
       const moisImporte: number = data.mois_detecte ?? importMois;
       const anneeImportee: number = data.annee_detecte ?? selectedAnnee;
       toast.success(`Import ${MOIS_NOMS[moisImporte - 1]} ${anneeImportee} : ${data.created} créés, ${data.updated} mis à jour`);
@@ -377,7 +380,7 @@ export default function CarburantPage() {
       await axios.post("/api/carburant", {
         matricule:       addForm.matricule.trim().toUpperCase(),
         mois:            addForm.mois,
-        annee:           THIS_YEAR,
+        annee:           anneeConsultee,
         type_carburant:  addForm.type_carburant || null,
         quantite_totale: addForm.quantite_totale ? parseFloat(addForm.quantite_totale) : null,
         montant_total:   addForm.montant_total   ? parseFloat(addForm.montant_total)   : null,
@@ -470,14 +473,9 @@ export default function CarburantPage() {
                   <option key={i + 1} value={i + 1}>{nom}</option>
                 ))}
               </select>
-              <select
-                value={selectedAnnee}
-                onChange={e => setSelectedAnnee(Number(e.target.value))}
-                className="text-sm font-semibold text-camublue-900 bg-transparent outline-none cursor-pointer ml-1 border-l border-gray-200 pl-2">
-                {[THIS_YEAR - 1, THIS_YEAR, THIS_YEAR + 1].map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+              <span className="text-sm font-semibold text-camublue-900 ml-1 border-l border-gray-200 pl-2" title="Année choisie dans le menu">
+                {selectedAnnee}
+              </span>
             </div>
 
             {/* Filtre rapide ESSENCE / GAZOIL */}
@@ -788,7 +786,9 @@ export default function CarburantPage() {
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-xs text-gray-500">Sélectionnez le mois concerné par ce fichier ({THIS_YEAR}).</p>
+              <p className="text-xs text-gray-500">
+                Sélectionnez le mois concerné par ce fichier ({anneeConsultee}). Un fichier annuel avec une colonne « Période » (AAAA-MM) est aussi accepté : chaque ligne est rangée dans son mois.
+              </p>
               <div className="grid grid-cols-3 gap-1.5">
                 {MOIS_NOMS.map((nom, i) => {
                   const m = i + 1;
@@ -803,7 +803,7 @@ export default function CarburantPage() {
               <button onClick={() => fileRef.current?.click()}
                 className="w-full bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition flex items-center justify-center gap-2">
                 <Upload size={15} />
-                Choisir le fichier — {MOIS_NOMS[importMois - 1]} {THIS_YEAR}
+                Choisir le fichier — {MOIS_NOMS[importMois - 1]} {anneeConsultee}
               </button>
             </div>
           </div>
@@ -837,7 +837,7 @@ export default function CarburantPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Mois ({THIS_YEAR})</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Mois ({anneeConsultee})</label>
                 <select className="input-base w-full" value={addForm.mois} onChange={e => setAddForm(f => ({ ...f, mois: Number(e.target.value) }))}>
                   {MOIS_NOMS.map((nom, i) => <option key={i+1} value={i+1}>{nom}</option>)}
                 </select>
