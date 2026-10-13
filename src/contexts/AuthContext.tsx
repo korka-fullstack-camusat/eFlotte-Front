@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import axios from "axios";
+import { invalidateAll } from "@/lib/apiCache";
 
 export interface AuthUser {
   username: string;
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    invalidateAll();   // données de l'utilisateur précédent
     setToken(null);
     setUser(null);
     localStorage.removeItem(TOKEN_KEY);

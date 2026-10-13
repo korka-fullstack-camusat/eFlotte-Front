@@ -10,9 +10,26 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>P.A.R.C-CAM</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Écran d'attente affiché dès réception du HTML (remplacé par React au démarrage) -->
+    <style>
+      html, body { margin: 0; background: #f4f6f9; }
+      #demarrage { min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 16px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      #demarrage p { margin: 0; color: #003c71; font-weight: 800; letter-spacing: .04em; font-size: 20px; }
+      #demarrage span { width: 32px; height: 32px; border-radius: 50%; border: 3px solid rgba(0,60,113,.15);
+        border-top-color: #003c71; animation: tourne .8s linear infinite; }
+      @keyframes tourne { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { #demarrage span { animation-duration: 2.4s; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="demarrage" role="status" aria-live="polite">
+        <p>P.A.R.C-CAM</p>
+        <span aria-hidden="true"></span>
+        <div style="position:absolute;left:-9999px">Chargement…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

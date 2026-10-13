@@ -1,29 +1,37 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-const LoginPage          = lazy(() => import("@/pages/LoginPage"));
-const LandingPage        = lazy(() => import("@/pages/LandingPage"));
-const DashboardPage      = lazy(() => import("@/pages/DashboardPage"));
-const DataFlottesPage    = lazy(() => import("@/pages/DataFlottesPage"));
-const ChauffeurPolesPage = lazy(() => import("@/pages/ChauffeurPolesPage"));
-const SuiviDevisPage     = lazy(() => import("@/pages/SuiviDevisPage"));
-const CheckListsVLPage   = lazy(() => import("@/pages/CheckListsVLPage"));
-const EntretiensPage     = lazy(() => import("@/pages/EntretiensPage"));
-const EntretienBisPage   = lazy(() => import("@/pages/EntretienBisPage"));
-const SuiviPannePage     = lazy(() => import("@/pages/SuiviPannePage"));
-const PneumatiquePage    = lazy(() => import("@/pages/PneumatiquePage"));
-const SuiviSinistrePage  = lazy(() => import("@/pages/SuiviSinistrePage"));
-const ImportPage         = lazy(() => import("@/pages/ImportPage"));
-const ExportPage         = lazy(() => import("@/pages/ExportPage"));
-const UsersPage          = lazy(() => import("@/pages/UsersPage"));
-const CarburantPage      = lazy(() => import("@/pages/CarburantPage"));
-const RecapPannePage     = lazy(() => import("@/pages/RecapPannePage"));
-const InspectionsPage    = lazy(() => import("@/pages/InspectionsPage"));
-const ChauffeurHomePage       = lazy(() => import("@/pages/chauffeur/ChauffeurHomePage"));
-const ChauffeurHistoriquePage = lazy(() => import("@/pages/chauffeur/ChauffeurHistoriquePage"));
-const ChauffeurProfilPage     = lazy(() => import("@/pages/chauffeur/ChauffeurProfilPage"));
-const PremiereConnexionPage   = lazy(() => import("@/pages/PremiereConnexionPage"));
+// Pages chargées à la demande ; toutes sont préchargées en arrière-plan une fois
+// l'application affichée, pour que la navigation suivante soit instantanée.
+const prechargements: Array<() => Promise<unknown>> = [];
+function page<T extends ComponentType<any>>(charger: () => Promise<{ default: T }>) {
+  prechargements.push(charger);
+  return lazy(charger);
+}
+
+const LoginPage          = page(() => import("@/pages/LoginPage"));
+const LandingPage        = page(() => import("@/pages/LandingPage"));
+const DashboardPage      = page(() => import("@/pages/DashboardPage"));
+const DataFlottesPage    = page(() => import("@/pages/DataFlottesPage"));
+const ChauffeurPolesPage = page(() => import("@/pages/ChauffeurPolesPage"));
+const SuiviDevisPage     = page(() => import("@/pages/SuiviDevisPage"));
+const CheckListsVLPage   = page(() => import("@/pages/CheckListsVLPage"));
+const EntretiensPage     = page(() => import("@/pages/EntretiensPage"));
+const EntretienBisPage   = page(() => import("@/pages/EntretienBisPage"));
+const SuiviPannePage     = page(() => import("@/pages/SuiviPannePage"));
+const PneumatiquePage    = page(() => import("@/pages/PneumatiquePage"));
+const SuiviSinistrePage  = page(() => import("@/pages/SuiviSinistrePage"));
+const ImportPage         = page(() => import("@/pages/ImportPage"));
+const ExportPage         = page(() => import("@/pages/ExportPage"));
+const UsersPage          = page(() => import("@/pages/UsersPage"));
+const CarburantPage      = page(() => import("@/pages/CarburantPage"));
+const RecapPannePage     = page(() => import("@/pages/RecapPannePage"));
+const InspectionsPage    = page(() => import("@/pages/InspectionsPage"));
+const ChauffeurHomePage       = page(() => import("@/pages/chauffeur/ChauffeurHomePage"));
+const ChauffeurHistoriquePage = page(() => import("@/pages/chauffeur/ChauffeurHistoriquePage"));
+const ChauffeurProfilPage     = page(() => import("@/pages/chauffeur/ChauffeurProfilPage"));
+const PremiereConnexionPage   = page(() => import("@/pages/PremiereConnexionPage"));
 
 function PageLoader() {
   return (
@@ -34,6 +42,12 @@ function PageLoader() {
 }
 
 export default function App() {
+  useEffect(() => {
+    const lancer = () => prechargements.forEach(charger => charger().catch(() => {}));
+    const t = window.setTimeout(lancer, 2000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>

@@ -6,11 +6,20 @@ import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AnneeProvider } from "./contexts/AnneeContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { invalidateAll } from "./lib/apiCache";
 import "./index.css";
 
 if (import.meta.env.VITE_API_URL) {
   axios.defaults.baseURL = import.meta.env.VITE_API_URL;
 }
+
+// Toute modification (import, ajout, édition, suppression, connexion) rend les données
+// gardées en cache obsolètes : on les oublie pour ne jamais réafficher d'anciens chiffres
+axios.interceptors.response.use(res => {
+  const methode = (res.config.method ?? "get").toLowerCase();
+  if (methode !== "get" && methode !== "head") invalidateAll();
+  return res;
+});
 
 // Garde le backend Render éveillé (évite le cold start de 30s sur le free tier)
 function startKeepAlive() {

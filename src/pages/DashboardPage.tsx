@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { CheckCircle, Wallet, Fuel, BarChart2, Filter, X, Car, Wrench, Route, DollarSign, Droplets, RefreshCw } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { vehiculeService, coutService } from "@/services/api";
 import axios from "axios";
-import { getCached, TTL_LONG, TTL_SHORT } from "@/lib/apiCache";
+import { getCached, peekCached, TTL_LONG, TTL_SHORT } from "@/lib/apiCache";
 import { useAnnee } from "@/contexts/AnneeContext";
 import type { Vehicule, KpiCouts, EvolutionPoint, VehiculeCoutPoint, FiltresCouts, CoutsFilters } from "@/types"; // VehiculeCoutPoint used for state types
 import { KpiCard, DonutChart } from "@/components/charts";
@@ -81,57 +81,67 @@ export default function DashboardPage() {
   const [draft,              setDraft]              = useState<CoutsFilters>({});
   const [loading,            setLoading]            = useState(false);
 
-  // Données statiques (flotte + filtres disponibles) — cachées 5 min, chargement parallèle
-  useEffect(() => {
-    Promise.all([
-      getCached("vehicules:all",          () => vehiculeService.getAll(),                           TTL_LONG),
-      getCached("vehicules:stats",        () => axios.get("/api/vehicules/stats").then(r => r.data), TTL_LONG),
-      // Clé par année : les mois disponibles dépendent de l'année consultée
-      getCached(`couts:filtres:${annee}`, () => coutService.filtres(),                               TTL_LONG),
-    ]).then(([veh, vstats, filtresData]) => {
-      setVehicules(veh as typeof vehicules);
-      setVehiculeStats(vstats as VehiculeStats);
-      setFiltres(filtresData as FiltresCouts);
-    }).catch(() => {});
-  }, [annee]);
+  // Carburant : mois propre à la section (suit le filtre du tableau de bord, modifiable sur place)
+  const moisFiltreNum = filters.mois ? Number(String(filters.mois).split("-")[1]) : undefined;
+  const [moisCarburant, setMoisCarburant] = useState<number | undefined>(moisFiltreNum);
+  useEffect(() => { setMoisCarburant(moisFiltreNum); }, [moisFiltreNum]);
 
-  // Données filtrées — toutes les courbes et KPIs
-  useEffect(() => {
-    setLoading(true);
+  // Chaque requête : clé de cache, appel API, mise à jour de l'état. Au premier rendu, la
+  // dernière valeur connue (gardée dans le navigateur) s'affiche tout de suite ; l'API est
+  // interrogée en parallèle et l'affichage se met à jour à la réception.
+  type Requete = [cle: string, appel: () => Promise<unknown>, appliquer: (d: any) => void, ttl: number];
+
+  const requetesStatiques = useMemo((): Requete[] => [
+    ["vehicules:all",          () => vehiculeService.getAll(),                           setVehicules,     TTL_LONG],
+    ["vehicules:stats",        () => axios.get("/api/vehicules/stats").then(r => r.data), setVehiculeStats, TTL_LONG],
+    // Clé par année : les mois disponibles dépendent de l'année consultée
+    [`couts:filtres:${annee}`, () => coutService.filtres(),                               setFiltres,       TTL_LONG],
+  ], [annee]);
+
+  const requetesFiltrees = useMemo((): Requete[] => {
     const p: CoutsFilters = { ...filters, annee };
-    // Mois au format "AAAA-MM-JJ" → numéro du mois pour carburant, devis et sinistres
+    // Mois au format "AAAA-MM-JJ" → numéro du mois pour devis et sinistres
     const numMois = p.mois ? Number(String(p.mois).split("-")[1]) : undefined;
-    const carParams: Record<string, any> = { annee, mois: numMois, matricule: p.plaque };
     const suiviParams: Record<string, any> = { annee, mois: numMois, plaque: p.plaque };
-
     // Évolution : tous les mois de l'année (le filtre de mois ne s'applique pas à la courbe)
     const evoP: CoutsFilters = { ...p, mois: undefined };
-
     const fKey = JSON.stringify(p);
-    Promise.all([
-      getCached(`kpi:${fKey}`,        () => coutService.kpi(p),                                                   TTL_SHORT),
-      getCached(`evo:car:${fKey}`,    () => coutService.evolution({ ...evoP, type_cout: "CARBURANT" }),            TTL_SHORT),
-      getCached(`evo:ent:${fKey}`,    () => coutService.evolution({ ...evoP, type_cout: "ENT" }),                  TTL_SHORT),
-      getCached(`evo:rep:${fKey}`,    () => coutService.evolution({ ...evoP, type_cout: "REP" }),                  TTL_SHORT),
-      getCached(`topcar:${fKey}`,     () => coutService.topCarburant({ annee: p.annee, mois: p.mois as any, plaque: p.plaque, type_vehicule: p.type_vehicule, fournisseur: p.fournisseur, type_location: p.type_location, limit: 10 }), TTL_SHORT),
-      getCached(`topkm:${fKey}`,      () => coutService.parVehicule({ ...p, type_cout: "DISTANCE", limit: 10 }),   TTL_SHORT),
-      getCached(`toprep:${fKey}`,     () => coutService.parVehicule({ ...p, type_cout: "REP",      limit: 10 }),   TTL_SHORT),
-      getCached(`carbstats:${fKey}`,  () => axios.get("/api/carburant/stats", { params: carParams }).then(r => r.data), TTL_SHORT),
-      getCached(`devis:${fKey}`,      () => axios.get("/api/suivi-devis/stats", { params: suiviParams }).then(r => r.data), TTL_SHORT),
-      getCached(`sinistres:${fKey}`,  () => axios.get("/api/sinistres/stats", { params: suiviParams }).then(r => r.data), TTL_SHORT),
-    ]).then(([kpiData, evoCar, evoEnt, evoRep, topCar, topKmData, topRep, carbStats, devis, sinistres]) => {
-      setKpi(kpiData as KpiCouts);
-      setEvolutionCarburant(evoCar as EvolutionPoint[]);
-      setEvolutionMaint(evoEnt as EvolutionPoint[]);
-      setEvolutionRep(evoRep as EvolutionPoint[]);
-      setTopCarburant(topCar as VehiculeCoutPoint[]);
-      setTopKm(topKmData as VehiculeCoutPoint[]);
-      setTopReparation(topRep as VehiculeCoutPoint[]);
-      setCarburantStats(carbStats as CarburantStats);
-      setDevisStats(devis as DevisStats);
-      setSinistresStats(sinistres as SinistresStats);
-    }).catch(() => {}).finally(() => setLoading(false));
+    return [
+      [`kpi:${fKey}`,       () => coutService.kpi(p),                                                setKpi,                TTL_SHORT],
+      [`evo:car:${fKey}`,   () => coutService.evolution({ ...evoP, type_cout: "CARBURANT" }),         setEvolutionCarburant, TTL_SHORT],
+      [`evo:ent:${fKey}`,   () => coutService.evolution({ ...evoP, type_cout: "ENT" }),               setEvolutionMaint,     TTL_SHORT],
+      [`evo:rep:${fKey}`,   () => coutService.evolution({ ...evoP, type_cout: "REP" }),               setEvolutionRep,       TTL_SHORT],
+      [`topcar:${fKey}`,    () => coutService.topCarburant({ annee: p.annee, mois: p.mois as any, plaque: p.plaque, type_vehicule: p.type_vehicule, fournisseur: p.fournisseur, type_location: p.type_location, limit: 10 }), setTopCarburant, TTL_SHORT],
+      [`topkm:${fKey}`,     () => coutService.parVehicule({ ...p, type_cout: "DISTANCE", limit: 10 }), setTopKm,              TTL_SHORT],
+      [`toprep:${fKey}`,    () => coutService.parVehicule({ ...p, type_cout: "REP",      limit: 10 }), setTopReparation,      TTL_SHORT],
+      [`devis:${fKey}`,     () => axios.get("/api/suivi-devis/stats", { params: suiviParams }).then(r => r.data), setDevisStats,     TTL_SHORT],
+      [`sinistres:${fKey}`, () => axios.get("/api/sinistres/stats", { params: suiviParams }).then(r => r.data),  setSinistresStats, TTL_SHORT],
+    ];
   }, [filters, annee]);
+
+  const requetesCarburant = useMemo((): Requete[] => {
+    const params = { annee, mois: moisCarburant, matricule: filters.plaque };
+    return [[`carbstats:${JSON.stringify(params)}`,
+      () => axios.get("/api/carburant/stats", { params }).then(r => r.data), setCarburantStats, TTL_SHORT]];
+  }, [annee, moisCarburant, filters.plaque]);
+
+  // Affichage immédiat des dernières valeurs connues, avant le premier dessin de la page
+  useLayoutEffect(() => {
+    for (const [cle, , appliquer] of [...requetesStatiques, ...requetesFiltrees, ...requetesCarburant]) {
+      const connu = peekCached(cle);
+      if (connu !== undefined) appliquer(connu);
+    }
+  }, [requetesStatiques, requetesFiltrees, requetesCarburant]);
+
+  const charger = (requetes: Requete[], indicateur = false) => {
+    if (indicateur) setLoading(true);
+    Promise.all(requetes.map(([cle, appel, appliquer, ttl]) =>
+      getCached(cle, appel, ttl).then(appliquer).catch(() => {})
+    )).finally(() => { if (indicateur) setLoading(false); });
+  };
+  useEffect(() => { charger(requetesStatiques); }, [requetesStatiques]);
+  useEffect(() => { charger(requetesFiltrees, true); }, [requetesFiltrees]);
+  useEffect(() => { charger(requetesCarburant); }, [requetesCarburant]);
 
   // Dérivés flotte
   const enServiceCount     = vehiculeStats?.en_service     ?? vehicules.filter(v => normStatut(v.statut) === "EN_SERVICE").length;
@@ -318,7 +328,23 @@ export default function DashboardPage() {
       {/* ── Carburant : KPIs gauche + gazoil/essence donut droite ──────── */}
       {carburantStats && (
         <div className="mb-5">
-          <SectionTitle>Carburant — {periodeLabel}</SectionTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <SectionTitle>
+              Carburant — {moisCarburant ? `${MOIS_NOMS[moisCarburant - 1]} ${annee}` : annee}
+            </SectionTitle>
+            <div className="flex items-center gap-2 mb-3">
+              <label htmlFor="mois-carburant" className="text-xs font-semibold text-gray-500">Mois</label>
+              <select id="mois-carburant" className="input-base py-1.5 text-sm w-auto"
+                value={moisCarburant ?? ""}
+                onChange={e => setMoisCarburant(e.target.value ? Number(e.target.value) : undefined)}>
+                <option value="">Toute l'année</option>
+                {moisDisponibles.map(m => {
+                  const n = Number(m.split("-")[1]);
+                  return <option key={m} value={n}>{MOIS_NOMS[n - 1]}</option>;
+                })}
+              </select>
+            </div>
+          </div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex flex-col lg:flex-row gap-5 items-start">
               <div className="grid grid-cols-2 gap-3 flex-1">
@@ -336,7 +362,7 @@ export default function DashboardPage() {
                 </>)}
               </div>
               <div className="lg:w-96 w-full shrink-0">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Gazoil vs Essence (litres)</p>
+                <p className="text-xs font-semibold text-gray-500 mb-2">Gazoil vs Essence (litres){suffixeLitres}</p>
                 {carburantStats.litres_gazoil + carburantStats.litres_essence === 0
                   ? <p className="text-sm text-gray-400 text-center py-6">Aucune donnée</p>
                   : <DonutChart

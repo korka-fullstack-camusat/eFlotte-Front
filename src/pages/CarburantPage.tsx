@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import toast from "react-hot-toast";
 import { useAnnee } from "@/contexts/AnneeContext";
+import { garderCache, peekCached } from "@/lib/apiCache";
 import AppLayout from "@/components/layout/AppLayout";
 import ChartFilterBar, {
   ChartFilter, CHART_FILTER_EMPTY, applyChartFilter,
@@ -163,7 +164,14 @@ const THIS_YEAR = new Date().getFullYear();
 
 export default function CarburantPage() {
   const { annee: anneeConsultee } = useAnnee();
-  const [selectedMois,  setSelectedMois]  = useState<number>(new Date().getMonth() + 1);
+  // Dernier mois consulté (gardé dans le navigateur) : la page rouvre directement dessus
+  const [selectedMois,  setSelectedMois]  = useState<number>(() => {
+    try {
+      const m = Number(localStorage.getItem(`eflotte_carburant_mois_${anneeConsultee}`));
+      if (m >= 1 && m <= 12) return m;
+    } catch { /* stockage indisponible */ }
+    return new Date().getMonth() + 1;
+  });
   // L'année suit le sélecteur « Année » du menu (la page est rechargée quand il change)
   const [selectedAnnee, setSelectedAnnee] = useState<number>(anneeConsultee);
 
@@ -242,8 +250,9 @@ export default function CarburantPage() {
     const a = overrideAnnee ?? selectedAnnee;
     const cacheKey = `${a}-${m}|${carGroup}|${typeCarb}`;
 
-    // 1. Afficher immédiatement les données en cache (stale-while-revalidate)
-    const cached = cache.current.get(cacheKey);
+    // 1. Afficher immédiatement les données en cache (stale-while-revalidate), y compris
+    //    celles gardées dans le navigateur lors d'une visite précédente
+    const cached = cache.current.get(cacheKey) ?? peekCached<CarburantRow[]>(`carburant:lignes:${cacheKey}`);
     if (cached) {
       setRows(cached);
       computeStats(cached);
@@ -260,6 +269,7 @@ export default function CarburantPage() {
       const { data } = await axios.get("/api/carburant", { params });
       const fetched: CarburantRow[] = data.items;
       cache.current.set(cacheKey, fetched);
+      garderCache(`carburant:lignes:${cacheKey}`, fetched);
       setRows(fetched);
       computeStats(fetched);
     } finally {
@@ -278,12 +288,18 @@ export default function CarburantPage() {
       axios.get("/api/carburant/periodes"),
       fetchFiltres(),
     ]).then(([{ data: periodes }]) => {
-      if (periodes.length > 0) {
-        setSelectedMois(periodes[0].mois);
-        setSelectedAnnee(periodes[0].annee);
+      // Garder le mois rouvert s'il a des données, sinon aller au dernier mois disponible
+      const dispo = (periodes as { mois: number; annee: number }[]).filter(p => p.annee === anneeConsultee);
+      if (dispo.length > 0 && !dispo.some(p => p.mois === selectedMois)) {
+        setSelectedMois(dispo[0].mois);
+        setSelectedAnnee(dispo[0].annee);
       }
     }).catch(() => {});
   }, []); // eslint-disable-line
+
+  useEffect(() => {
+    try { localStorage.setItem(`eflotte_carburant_mois_${anneeConsultee}`, String(selectedMois)); } catch { /* indisponible */ }
+  }, [selectedMois, anneeConsultee]);
 
   useEffect(() => {
     setPage(1);
