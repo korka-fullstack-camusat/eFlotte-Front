@@ -559,13 +559,6 @@ export default function CarburantPage() {
           </div>
         )}
 
-        {rows.length > 0 && !couverture.litres && (
-          <p role="note" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
-            Pour ce mois, le fichier ne contient que le récapitulatif « Suivi global des coûts » :
-            coût carburant HT et distance par véhicule. Litres, TTC et type de carburant ne sont pas fournis.
-          </p>
-        )}
-
         {/* Barre de recherche */}
         <div className="flex justify-center mb-6">
           <div className="relative w-full max-w-md">

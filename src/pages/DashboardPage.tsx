@@ -4,6 +4,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { vehiculeService, coutService } from "@/services/api";
 import axios from "axios";
 import { getCached, TTL_LONG, TTL_SHORT } from "@/lib/apiCache";
+import { useAnnee } from "@/contexts/AnneeContext";
 import type { Vehicule, KpiCouts, EvolutionPoint, VehiculeCoutPoint, FiltresCouts, CoutsFilters } from "@/types"; // VehiculeCoutPoint used for state types
 import { KpiCard, DonutChart } from "@/components/charts";
 
@@ -59,9 +60,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-const THIS_YEAR = new Date().getFullYear();
-
 export default function DashboardPage() {
+  // Année = sélecteur global de la barre latérale ; le filtre du tableau de bord affine (mois, plaque…)
+  const { annee } = useAnnee();
   const [vehicules,          setVehicules]          = useState<Vehicule[]>([]);
   const [vehiculeStats,      setVehiculeStats]      = useState<VehiculeStats | null>(null);
   const [carburantStats,     setCarburantStats]     = useState<CarburantStats | null>(null);
@@ -75,49 +76,38 @@ export default function DashboardPage() {
   const [devisStats,         setDevisStats]         = useState<DevisStats | null>(null);
   const [sinistresStats,     setSinistresStats]     = useState<SinistresStats | null>(null);
   const [filtres,            setFiltres]            = useState<FiltresCouts | null>(null);
-  const [filters,            setFilters]            = useState<CoutsFilters>({ annee: THIS_YEAR });
+  const [filters,            setFilters]            = useState<CoutsFilters>({});
   const [filterModal,        setFilterModal]        = useState(false);
-  const [draft,              setDraft]              = useState<CoutsFilters>({ annee: THIS_YEAR });
+  const [draft,              setDraft]              = useState<CoutsFilters>({});
   const [loading,            setLoading]            = useState(false);
 
   // Données statiques (flotte + filtres disponibles) — cachées 5 min, chargement parallèle
   useEffect(() => {
     Promise.all([
-      getCached("vehicules:all",      () => vehiculeService.getAll(),                           TTL_LONG),
-      getCached("vehicules:stats",    () => axios.get("/api/vehicules/stats").then(r => r.data), TTL_LONG),
-      getCached("couts:filtres",      () => coutService.filtres(),                               TTL_LONG),
-      getCached("devis:stats",        () => axios.get("/api/suivi-devis/stats").then(r => r.data), TTL_LONG),
-      getCached("sinistres:stats",    () => axios.get("/api/sinistres/stats").then(r => r.data),  TTL_LONG),
-    ]).then(([veh, vstats, filtresData, devis, sinistres]) => {
+      getCached("vehicules:all",          () => vehiculeService.getAll(),                           TTL_LONG),
+      getCached("vehicules:stats",        () => axios.get("/api/vehicules/stats").then(r => r.data), TTL_LONG),
+      // Clé par année : les mois disponibles dépendent de l'année consultée
+      getCached(`couts:filtres:${annee}`, () => coutService.filtres(),                               TTL_LONG),
+    ]).then(([veh, vstats, filtresData]) => {
       setVehicules(veh as typeof vehicules);
       setVehiculeStats(vstats as VehiculeStats);
       setFiltres(filtresData as FiltresCouts);
-      setDevisStats(devis as DevisStats);
-      setSinistresStats(sinistres as SinistresStats);
     }).catch(() => {});
-  }, []);
+  }, [annee]);
 
   // Données filtrées — toutes les courbes et KPIs
   useEffect(() => {
     setLoading(true);
-    const p: CoutsFilters = { ...filters };
-    // Si aucun filtre annee/mois, défaut = année courante
-    if (!p.annee && !p.mois) p.annee = THIS_YEAR;
+    const p: CoutsFilters = { ...filters, annee };
+    // Mois au format "AAAA-MM-JJ" → numéro du mois pour carburant, devis et sinistres
+    const numMois = p.mois ? Number(String(p.mois).split("-")[1]) : undefined;
+    const carParams: Record<string, any> = { annee, mois: numMois, matricule: p.plaque };
+    const suiviParams: Record<string, any> = { annee, mois: numMois, plaque: p.plaque };
 
-    // Params carburant : extraire mois/annee depuis le format "YYYY-MM"
-    const carParams: Record<string, any> = {};
-    if (p.mois) {
-      const [ay, am] = String(p.mois).split("-");
-      carParams.annee = Number(ay);
-      carParams.mois  = Number(am);
-    } else if (p.annee) {
-      carParams.annee = p.annee;
-    }
+    // Évolution : tous les mois de l'année (le filtre de mois ne s'applique pas à la courbe)
+    const evoP: CoutsFilters = { ...p, mois: undefined };
 
-    // Pour l'évolution, on ne restreint pas à l'année par défaut — on veut tous les mois disponibles
-    const evoP: CoutsFilters = { ...filters };
-
-    const fKey = JSON.stringify({ ...p, ...carParams });
+    const fKey = JSON.stringify(p);
     Promise.all([
       getCached(`kpi:${fKey}`,        () => coutService.kpi(p),                                                   TTL_SHORT),
       getCached(`evo:car:${fKey}`,    () => coutService.evolution({ ...evoP, type_cout: "CARBURANT" }),            TTL_SHORT),
@@ -127,7 +117,9 @@ export default function DashboardPage() {
       getCached(`topkm:${fKey}`,      () => coutService.parVehicule({ ...p, type_cout: "DISTANCE", limit: 10 }),   TTL_SHORT),
       getCached(`toprep:${fKey}`,     () => coutService.parVehicule({ ...p, type_cout: "REP",      limit: 10 }),   TTL_SHORT),
       getCached(`carbstats:${fKey}`,  () => axios.get("/api/carburant/stats", { params: carParams }).then(r => r.data), TTL_SHORT),
-    ]).then(([kpiData, evoCar, evoEnt, evoRep, topCar, topKmData, topRep, carbStats]) => {
+      getCached(`devis:${fKey}`,      () => axios.get("/api/suivi-devis/stats", { params: suiviParams }).then(r => r.data), TTL_SHORT),
+      getCached(`sinistres:${fKey}`,  () => axios.get("/api/sinistres/stats", { params: suiviParams }).then(r => r.data), TTL_SHORT),
+    ]).then(([kpiData, evoCar, evoEnt, evoRep, topCar, topKmData, topRep, carbStats, devis, sinistres]) => {
       setKpi(kpiData as KpiCouts);
       setEvolutionCarburant(evoCar as EvolutionPoint[]);
       setEvolutionMaint(evoEnt as EvolutionPoint[]);
@@ -136,8 +128,10 @@ export default function DashboardPage() {
       setTopKm(topKmData as VehiculeCoutPoint[]);
       setTopReparation(topRep as VehiculeCoutPoint[]);
       setCarburantStats(carbStats as CarburantStats);
+      setDevisStats(devis as DevisStats);
+      setSinistresStats(sinistres as SinistresStats);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [filters]);
+  }, [filters, annee]);
 
   // Dérivés flotte
   const enServiceCount     = vehiculeStats?.en_service     ?? vehicules.filter(v => normStatut(v.statut) === "EN_SERVICE").length;
@@ -153,17 +147,20 @@ export default function DashboardPage() {
     ...(nonRenseigneCount > 0 ? [{ label: "Non renseigné", value: nonRenseigneCount }] : []),
   ];
   const repartitionType        = aggregateCount(vehicules, v => v.type_vehicule);
-  const coutMaintenanceTotal   = evolutionMaint.reduce((s, p) => s + p.total, 0);
-  const coutReparationTotal    = evolutionRep.reduce((s, p) => s + p.total, 0);
+  // La courbe d'évolution couvre toute l'année : les KPIs ne retiennent que le mois filtré
+  const moisFiltre             = filters.mois ? Number(String(filters.mois).split("-")[1]) : undefined;
+  const totalPeriode           = (pts: EvolutionPoint[]) =>
+    pts.filter(p => !moisFiltre || p.mois === moisFiltre).reduce((s, p) => s + p.total, 0);
+  const coutMaintenanceTotal   = totalPeriode(evolutionMaint);
+  const coutReparationTotal    = totalPeriode(evolutionRep);
 
   // Label période affiché dans les titres
   const periodeLabel = useMemo(() => {
     if (filters.mois) return formatMois(filters.mois as string);
-    if (filters.annee) return String(filters.annee);
-    return String(THIS_YEAR);
-  }, [filters]);
+    return String(annee);
+  }, [filters, annee]);
 
-  const hasFilters = Object.keys(filters).some(k => filters[k as keyof CoutsFilters] !== undefined && k !== "annee") || (filters.annee !== THIS_YEAR);
+  const hasFilters = Object.values(filters).some(v => v !== undefined);
 
   const setDraftFilter = (key: keyof CoutsFilters, value: string | number | undefined) => {
     setDraft(f => {
@@ -173,23 +170,16 @@ export default function DashboardPage() {
       } else {
         delete (next as any)[key];
       }
-      // Quand on choisit un mois, on clear l'année (et vice-versa)
-      if (key === "mois" && value) delete next.annee;
-      if (key === "annee" && value) delete next.mois;
       return next;
     });
   };
 
   const openFilterModal = () => { setDraft(filters); setFilterModal(true); };
   const applyFilters    = () => { setFilters(draft); setFilterModal(false); };
-  const resetFilters    = () => { const d = { annee: THIS_YEAR }; setDraft(d); setFilters(d); setFilterModal(false); };
+  const resetFilters    = () => { setDraft({}); setFilters({}); setFilterModal(false); };
 
-  // Années disponibles depuis les filtres, fallback sur l'année courante
-  const anneesDisponibles = filtres?.annees?.length ? filtres.annees : [THIS_YEAR];
-  // Mois filtrés selon l'année sélectionnée dans le draft
-  const moisDisponibles = (filtres?.mois ?? []).filter(m =>
-    !draft.annee || m.startsWith(String(draft.annee))
-  );
+  // Mois ayant des données dans l'année consultée
+  const moisDisponibles = (filtres?.mois ?? []).filter(m => m.startsWith(String(annee)));
 
   return (
     <AppLayout>
@@ -277,7 +267,7 @@ export default function DashboardPage() {
       {/* ── Suivi Devis : KPIs gauche + PO fournisseur donut droite ────── */}
       {devisStats && (
         <div className="mb-5">
-          <SectionTitle>Suivi des devis — Global</SectionTitle>
+          <SectionTitle>Suivi des devis — {periodeLabel}</SectionTitle>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex flex-col lg:flex-row gap-5 items-start">
               <div className="grid grid-cols-2 gap-3 flex-1">
@@ -300,7 +290,7 @@ export default function DashboardPage() {
       {/* ── Sinistres : KPIs gauche + circonstances donut droite ────────── */}
       {sinistresStats && (
         <div className="mb-5">
-          <SectionTitle>Suivi des sinistres — Circonstances</SectionTitle>
+          <SectionTitle>Suivi des sinistres — {periodeLabel}</SectionTitle>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex flex-col lg:flex-row gap-5 items-start">
               <div className="grid grid-cols-2 gap-3 flex-1">
@@ -328,12 +318,17 @@ export default function DashboardPage() {
             <div className="flex flex-col lg:flex-row gap-5 items-start">
               <div className="grid grid-cols-2 gap-3 flex-1">
                 <KpiCard label="Véhicules suivis"  value={carburantStats.total_vehicules}              icon={<Car size={18}/>}        bg="bg-camublue-900/10" text="text-camublue-900" />
+                {carburantStats.total_litres > 0 && (
                 <KpiCard label="Total litres"      value={Math.round(carburantStats.total_litres)}   suffix=" L" icon={<Droplets size={18}/>}   bg="bg-blue-50"         text="text-blue-700" />
+                )}
                 {/* HT : seul coût fourni pour tous les mois (les mois issus du récap des coûts n'ont pas de TTC) */}
                 <KpiCard label="Coût total HT (FCFA)" value={Math.round(carburantStats.total_montant_ht ?? 0)}  icon={<DollarSign size={18}/>} bg="bg-green-50"        text="text-green-700" />
                 <KpiCard label="Distance totale"   value={Math.round(carburantStats.total_distance)} suffix=" km" icon={<Route size={18}/>}    bg="bg-amber-50"        text="text-amber-700" />
+                {/* Litres absents pour les mois issus du récap des coûts : cartes masquées plutôt que « 0 L » */}
+                {carburantStats.total_litres > 0 && (<>
                 <KpiCard label="Gazoil (L)"        value={Math.round(carburantStats.litres_gazoil)}             icon={<Fuel size={18}/>}       bg="bg-camublue-900/10" text="text-camublue-900" />
                 <KpiCard label="Essence (L)"       value={Math.round(carburantStats.litres_essence)}            icon={<Fuel size={18}/>}       bg="bg-orange-50"       text="text-orange-600" />
+                </>)}
               </div>
               <div className="lg:w-96 w-full shrink-0">
                 <p className="text-xs font-semibold text-gray-500 mb-2">Gazoil vs Essence (litres)</p>
@@ -353,7 +348,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Évolution des coûts par mois ────────────────────────────────── */}
-      <SectionTitle>Évolution des coûts — Tous les mois disponibles</SectionTitle>
+      <SectionTitle>Évolution des coûts — {annee}</SectionTitle>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="text-sm font-bold text-camublue-900 mb-3">Carburant par mois (FCFA)</h3>
@@ -428,23 +423,14 @@ export default function DashboardPage() {
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Année */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Année</label>
-                <select
-                  value={draft.annee ?? ""}
-                  onChange={e => setDraftFilter("annee", e.target.value ? Number(e.target.value) : undefined)}
-                  className="input-base"
-                >
-                  <option value="">Toutes les années</option>
-                  {anneesDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
+              <p className="text-xs text-gray-500">
+                Année <strong className="text-camublue-900">{annee}</strong> — elle se change dans la barre latérale.
+              </p>
 
-              {/* Mois (filtré selon l'année choisie) */}
+              {/* Mois (de l'année consultée) */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Mois</label>
-                <select
+                <label htmlFor="filtre-mois" className="block text-xs font-semibold text-gray-600 mb-1.5">Mois</label>
+                <select id="filtre-mois"
                   value={draft.mois ?? ""}
                   onChange={e => setDraftFilter("mois", e.target.value || undefined)}
                   className="input-base"
