@@ -317,6 +317,12 @@ export default function CarburantPage() {
     );
   }, [rows, search]);
   const nbVehiculesAffiches = useMemo(() => new Set(filtered.map(r => r.matricule)).size, [filtered]);
+  // Mois venant du « Suivi global des coûts » : coût HT et distance seulement (pas de litres ni de TTC)
+  const couverture = useMemo(() => ({
+    litres: rows.some(r => r.quantite_totale != null),
+    ttc:    rows.some(r => r.montant_total != null),
+    ht:     Math.round(rows.reduce((acc, r) => acc + (r.mt_ht ?? 0), 0)),
+  }), [rows]);
   const totalPages  = Math.ceil(filtered.length / pageSize);
   const displayRows = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
@@ -527,19 +533,37 @@ export default function CarburantPage() {
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard icon={<Fuel size={20} />} label="Total litres"
-              value={`${fmt(stats.total_litres, 0)} L`}
-              sub={`Gazoil : ${fmt(stats.litres_gazoil, 0)} L · Essence : ${fmt(stats.litres_essence, 0)} L`} />
-            <KpiCard icon={<DollarSign size={20} />} label="Coût total"
-              value={`${fmt(stats.total_montant)} FCFA`}
-              sub={`Gazoil : ${fmt(stats.montant_gazoil)} · Essence : ${fmt(stats.montant_essence)}`}
-              color="bg-green-50 text-green-700" />
+              value={couverture.litres ? `${fmt(stats.total_litres, 0)} L` : "—"}
+              sub={couverture.litres
+                ? `Gazoil : ${fmt(stats.litres_gazoil, 0)} L · Essence : ${fmt(stats.litres_essence, 0)} L`
+                : "Non fourni pour ce mois"} />
+            {couverture.ttc || !couverture.ht ? (
+              <KpiCard icon={<DollarSign size={20} />} label="Coût total"
+                value={`${fmt(stats.total_montant)} FCFA`}
+                sub={`Gazoil : ${fmt(stats.montant_gazoil)} · Essence : ${fmt(stats.montant_essence)}`}
+                color="bg-green-50 text-green-700" />
+            ) : (
+              <KpiCard icon={<DollarSign size={20} />} label="Coût total HT"
+                value={`${fmt(couverture.ht)} FCFA`}
+                sub="TTC non fourni pour ce mois"
+                color="bg-green-50 text-green-700" />
+            )}
             <KpiCard icon={<Route size={20} />} label="Distance totale"
               value={`${fmt(stats.total_distance)} km`} color="bg-amber-50 text-amber-700" />
             <KpiCard icon={<TrendingUp size={20} />} label="Véhicules"
               value={`${stats.total_vehicules}`}
-              sub={`Gazoil : ${stats.nb_gazoil} · Essence : ${stats.nb_essence}`}
+              sub={stats.nb_gazoil + stats.nb_essence > 0
+                ? `Gazoil : ${stats.nb_gazoil} · Essence : ${stats.nb_essence}`
+                : "Type de carburant non fourni"}
               color="bg-purple-50 text-purple-700" />
           </div>
+        )}
+
+        {rows.length > 0 && !couverture.litres && (
+          <p role="note" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+            Pour ce mois, le fichier ne contient que le récapitulatif « Suivi global des coûts » :
+            coût carburant HT et distance par véhicule. Litres, TTC et type de carburant ne sont pas fournis.
+          </p>
         )}
 
         {/* Barre de recherche */}

@@ -12,7 +12,7 @@ interface VehiculeStats {
   immobilises: number; taux_disponibilite: number; essence: number; gasoil: number;
 }
 interface CarburantStats {
-  total_vehicules: number; total_litres: number; total_montant: number;
+  total_vehicules: number; total_litres: number; total_montant: number; total_montant_ht?: number;
   total_distance: number; nb_gazoil: number; nb_essence: number;
   litres_gazoil: number; litres_essence: number;
   montant_gazoil: number; montant_essence: number;
@@ -329,7 +329,8 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 gap-3 flex-1">
                 <KpiCard label="Véhicules suivis"  value={carburantStats.total_vehicules}              icon={<Car size={18}/>}        bg="bg-camublue-900/10" text="text-camublue-900" />
                 <KpiCard label="Total litres"      value={Math.round(carburantStats.total_litres)}   suffix=" L" icon={<Droplets size={18}/>}   bg="bg-blue-50"         text="text-blue-700" />
-                <KpiCard label="Coût total (FCFA)" value={Math.round(carburantStats.total_montant)}             icon={<DollarSign size={18}/>} bg="bg-green-50"        text="text-green-700" />
+                {/* HT : seul coût fourni pour tous les mois (les mois issus du récap des coûts n'ont pas de TTC) */}
+                <KpiCard label="Coût total HT (FCFA)" value={Math.round(carburantStats.total_montant_ht ?? 0)}  icon={<DollarSign size={18}/>} bg="bg-green-50"        text="text-green-700" />
                 <KpiCard label="Distance totale"   value={Math.round(carburantStats.total_distance)} suffix=" km" icon={<Route size={18}/>}    bg="bg-amber-50"        text="text-amber-700" />
                 <KpiCard label="Gazoil (L)"        value={Math.round(carburantStats.litres_gazoil)}             icon={<Fuel size={18}/>}       bg="bg-camublue-900/10" text="text-camublue-900" />
                 <KpiCard label="Essence (L)"       value={Math.round(carburantStats.litres_essence)}            icon={<Fuel size={18}/>}       bg="bg-orange-50"       text="text-orange-600" />
