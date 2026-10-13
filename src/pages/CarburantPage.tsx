@@ -196,7 +196,6 @@ export default function CarburantPage() {
 
   const [importing, setImporting] = useState(false);
   const [importModal, setImportModal] = useState(false);
-  const [importMois,  setImportMois]  = useState<number>(new Date().getMonth() + 1);
   const [addModal,  setAddModal]  = useState(false);
   const [addForm,   setAddForm]   = useState({ matricule: "", mois: new Date().getMonth() + 1, type_carburant: "", quantite_totale: "", montant_total: "", distance_totale: "", car_group: "" });
   const [addSaving, setAddSaving] = useState(false);
@@ -337,10 +336,7 @@ export default function CarburantPage() {
 
   // ── Import ────────────────────────────────────────────────────────────────
 
-  const openImportModal = () => {
-    setImportMois(selectedMois);
-    setImportModal(true);
-  };
+  const openImportModal = () => setImportModal(true);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -350,10 +346,15 @@ export default function CarburantPage() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const { data } = await axios.post(`/api/carburant/import?mois=${importMois}&annee=${anneeConsultee}`, fd);
-      const moisImporte: number = data.mois_detecte ?? importMois;
-      const anneeImportee: number = data.annee_detecte ?? selectedAnnee;
-      toast.success(`Import ${MOIS_NOMS[moisImporte - 1]} ${anneeImportee} : ${data.created} créés, ${data.updated} mis à jour`);
+      // Fichier annuel : le mois de chaque ligne est lu dans le fichier
+      const { data } = await axios.post(`/api/carburant/import?annee=${anneeConsultee}`, fd);
+      const moisImporte: number = data.mois_detecte ?? selectedMois;
+      const anneeImportee: number = data.annee_detecte ?? anneeConsultee;
+      const nbMois: number = data.mois_importes?.length ?? 1;
+      toast.success(`Import ${anneeImportee} : ${data.created + data.updated} lignes sur ${nbMois} mois`);
+      if (data.hors_annee) {
+        toast(`${data.hors_annee} ligne(s) d'une autre année ignorée(s)`, { duration: 6000 });
+      }
       if (data.errors?.length) {
         toast.error(`${data.errors.length} erreur(s) — voir console`, { duration: 6000 });
         console.warn("Erreurs import carburant:", data.errors);
@@ -775,35 +776,27 @@ export default function CarburantPage() {
         </div>
       )}
 
-      {/* ══ Modal Import — choix de la période ══════════════════════════════ */}
+      {/* ══ Modal Import — fichier annuel ════════════════════════════════ */}
       {importModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setImportModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="bg-camublue-900 px-5 py-3.5 flex items-center justify-between">
-              <p className="text-white font-bold text-sm">Importer — Choisir la période</p>
+              <p className="text-white font-bold text-sm">Importer le fichier annuel</p>
               <button onClick={() => setImportModal(false)} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
                 <X size={14} className="text-white" />
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-xs text-gray-500">
-                Sélectionnez le mois concerné par ce fichier ({anneeConsultee}). Un fichier annuel avec une colonne « Période » (AAAA-MM) est aussi accepté : chaque ligne est rangée dans son mois.
+              <p className="text-sm text-gray-600">
+                Fichier annuel <span className="font-semibold text-camublue-900">{anneeConsultee}</span> : le mois de chaque ligne est lu dans la colonne « Période » (ou « Mois », sinon « DernierPlein »).
               </p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {MOIS_NOMS.map((nom, i) => {
-                  const m = i + 1;
-                  return (
-                    <button key={m} onClick={() => setImportMois(m)}
-                      className={`py-2 rounded-lg text-xs font-semibold transition ${importMois === m ? "bg-camublue-900 text-white" : "bg-gray-50 text-gray-600 hover:bg-camublue-900/10"}`}>
-                      {nom}
-                    </button>
-                  );
-                })}
-              </div>
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Les données carburant de {anneeConsultee} seront remplacées par le contenu du fichier.
+              </p>
               <button onClick={() => fileRef.current?.click()}
                 className="w-full bg-camublue-900 hover:bg-camublue-900/90 text-white rounded-xl py-2.5 text-sm font-semibold transition flex items-center justify-center gap-2">
                 <Upload size={15} />
-                Choisir le fichier — {MOIS_NOMS[importMois - 1]} {anneeConsultee}
+                Choisir le fichier {anneeConsultee}
               </button>
             </div>
           </div>
