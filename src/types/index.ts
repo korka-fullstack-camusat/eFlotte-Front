@@ -541,6 +541,7 @@ export interface ResultatImportChauffeurs {
 
 export interface StatutSms {
   actif: boolean;
+  signature?: string;
   app_url: string;
   mot_de_passe_initial: string;
 }

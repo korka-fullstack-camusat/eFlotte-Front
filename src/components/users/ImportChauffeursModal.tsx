@@ -19,6 +19,20 @@ export default function ImportChauffeursModal({ onClose, onImporte }: { onClose:
   const [envoi, setEnvoi] = useState(false);
   const [resultat, setResultat] = useState<ResultatImportChauffeurs | null>(null);
   const [sms, setSms] = useState<StatutSms | null>(null);
+  const [telTest, setTelTest] = useState("");
+  const [testEnCours, setTestEnCours] = useState(false);
+
+  const testerSms = async () => {
+    setTestEnCours(true);
+    try {
+      const r = await chauffeurComptesService.testerSms(telTest);
+      toast.success(`SMS de test envoyé au ${r.telephone}. Vérifiez sa réception avant l'import.`, { duration: 6000 });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Envoi impossible", { duration: 10000 });
+    } finally {
+      setTestEnCours(false);
+    }
+  };
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => { chauffeurComptesService.statutSms().then(setSms).catch(() => {}); }, []);
@@ -105,10 +119,22 @@ export default function ImportChauffeursModal({ onClose, onImporte }: { onClose:
                   Les SMS ne sont pas encore configurés sur le serveur (Orange SMS API). Les comptes seront créés et vous pourrez télécharger la liste des identifiants à transmettre.
                 </p>
               ) : (
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="checkbox" checked={envoyer} onChange={e => setEnvoyer(e.target.checked)} className="w-4 h-4 accent-camublue-900" />
-                  <MessageSquare size={15} className="text-camublue-900" /> Envoyer les identifiants par SMS à chaque chauffeur
-                </label>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={envoyer} onChange={e => setEnvoyer(e.target.checked)} className="w-4 h-4 accent-camublue-900" />
+                    <MessageSquare size={15} className="text-camublue-900" /> Envoyer les identifiants par SMS à chaque chauffeur
+                    {sms?.signature && <span className="text-xs text-gray-400">(expéditeur : {sms.signature})</span>}
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl bg-gray-50 px-3 py-2.5">
+                    <label htmlFor="tel-test" className="text-xs font-semibold text-gray-600">Tester d'abord sur votre numéro :</label>
+                    <input id="tel-test" type="tel" value={telTest} onChange={e => setTelTest(e.target.value)}
+                      placeholder="77 123 45 67" className="input-base w-40 bg-white py-1.5" />
+                    <button type="button" onClick={testerSms} disabled={!telTest.trim() || testEnCours}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-camublue-900 text-camublue-900 text-xs font-semibold hover:bg-camublue-900/5 disabled:opacity-50">
+                      {testEnCours ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Envoyer un SMS de test
+                    </button>
+                  </div>
+                </div>
               )}
             </>
           ) : (

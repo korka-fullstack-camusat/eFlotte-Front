@@ -378,4 +378,6 @@ export const chauffeurComptesService = {
   envoyerIdentifiants: async (id: number): Promise<{ username: string; telephone: string | null; mot_de_passe_initial: string; sms: string; message: string | null }> =>
     (await axios.post(`/api/auth/chauffeurs/${id}/identifiants`)).data,
   statutSms: async (): Promise<StatutSms> => (await axios.get("/api/auth/chauffeurs/sms")).data,
+  testerSms: async (telephone: string): Promise<{ telephone: string; reponse: string }> =>
+    (await axios.post("/api/auth/chauffeurs/sms/test", { telephone })).data,
 };
