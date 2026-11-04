@@ -346,7 +346,8 @@ export const userService = {
     const { data } = await axios.get("/api/auth/users");
     return data;
   },
-  create: async (payload: { username: string; password: string; full_name?: string; email?: string; role: string; vehicule_plaque?: string; filiale?: string }): Promise<UserAccount> => {
+  /** Chauffeur : `sms` = résultat de l'envoi des identifiants (ENVOYE, ECHEC, NON_CONFIGURE, SANS_NUMERO). */
+  create: async (payload: { username: string; password: string; full_name?: string; email?: string; role: string; vehicule_plaque?: string; filiale?: string; telephone?: string; envoyer_sms?: boolean }): Promise<UserAccount & { sms?: string | null; sms_message?: string | null }> => {
     const { data } = await axios.post("/api/auth/users", payload);
     return data;
   },

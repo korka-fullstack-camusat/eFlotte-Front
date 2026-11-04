@@ -27,6 +27,8 @@ export default function UsersPage() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<UserAccount | null>(null);
   const [form, setForm] = useState(EMPTY);
+  // Création d'un chauffeur : identifiants envoyés par SMS au numéro saisi
+  const [envoyerSms, setEnvoyerSms] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
@@ -50,7 +52,7 @@ export default function UsersPage() {
   const pagedUsers = filtres.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
 
-  const openCreate = () => { setEditing(null); setForm(EMPTY); setModal(true); };
+  const openCreate = () => { setEditing(null); setForm(EMPTY); setEnvoyerSms(true); setModal(true); };
   const openEdit = (u: UserAccount) => {
     setEditing(u);
     setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role, vehicule_plaque: u.vehicule_plaque ?? "", filiale: u.filiale ?? "", telephone: u.telephone ?? "" });
@@ -71,8 +73,15 @@ export default function UsersPage() {
         await userService.update(editing.id, payload);
         toast.success("Utilisateur mis à jour");
       } else {
-        await userService.create({ ...form, username: form.username.trim(), vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "", filiale: form.role === "CHAUFFEUR" ? form.filiale : "" });
-        toast.success("Utilisateur créé");
+        const cree = await userService.create({
+          ...form, username: form.username.trim(),
+          vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "",
+          filiale: form.role === "CHAUFFEUR" ? form.filiale : "",
+          envoyer_sms: form.role === "CHAUFFEUR" && envoyerSms,
+        });
+        if (cree.sms === "ENVOYE") toast.success(`Compte créé · identifiants envoyés par SMS au ${cree.telephone}`, { duration: 6000 });
+        else if (cree.sms) toast(`Compte créé, mais SMS non envoyé : ${cree.sms_message ?? cree.sms}. Transmettez les identifiants au chauffeur ou réessayez avec « Envoyer les identifiants ».`, { icon: "⚠️", duration: 9000 });
+        else toast.success("Utilisateur créé");
       }
       setModal(false);
       load();
@@ -296,7 +305,20 @@ export default function UsersPage() {
                 <input type="password" value={form.password} required={!editing}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   className="input-base" />
+                {!editing && form.role === "CHAUFFEUR" && (
+                  <p className="mt-1 text-xs text-gray-500">Le chauffeur devra le remplacer par son propre mot de passe à la 1re connexion.</p>
+                )}
               </div>
+              {!editing && form.role === "CHAUFFEUR" && (
+                <label className="flex items-start gap-2 rounded-xl bg-camublue-900/5 px-3 py-2.5 text-sm text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={envoyerSms} onChange={e => setEnvoyerSms(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-camublue-900" />
+                  <span>
+                    Envoyer l'identifiant et le mot de passe par SMS au chauffeur
+                    {!form.telephone && <span className="block text-xs text-amber-700">Saisissez son numéro de téléphone pour que le SMS parte.</span>}
+                  </span>
+                </label>
+              )}
 
               <div className="flex gap-2 mt-2">
                 <button type="button" onClick={() => setModal(false)} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition">
