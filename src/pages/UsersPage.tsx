@@ -18,6 +18,19 @@ const ROLE_LABELS: Record<string, string> = {
   CHAUFFEUR: "Chauffeur (app mobile)",
 };
 
+/** Message lisible d'une erreur de l'API : texte, ou liste d'erreurs de validation (422). */
+function messageErreur(err: any): string {
+  if (!err?.response) return "Serveur injoignable. Vérifiez la connexion.";
+  const detail = err.response.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return "Données refusées par le serveur : " + detail
+      .map((d: any) => `${(d?.loc ?? []).filter((x: unknown) => x !== "body").join(".")} ${d?.msg ?? ""}`.trim())
+      .join(" ; ");
+  }
+  return `Erreur du serveur (${err.response.status})`;
+}
+
 const EMPTY = { username: "", password: "", full_name: "", email: "", role: "EDITOR", vehicule_plaque: "", filiale: "", telephone: "" };
 
 export default function UsersPage() {
@@ -88,7 +101,7 @@ export default function UsersPage() {
       setModal(false);
       load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur");
+      toast.error(messageErreur(err), { duration: 8000 });
     }
   };
 
@@ -100,7 +113,7 @@ export default function UsersPage() {
       else toast(`Mot de passe remis à « ${r.mot_de_passe_initial} ». SMS non envoyé : ${r.message ?? r.sms}`, { icon: "⚠️", duration: 8000 });
       load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur");
+      toast.error(messageErreur(err), { duration: 8000 });
     }
   };
 
@@ -111,7 +124,7 @@ export default function UsersPage() {
       toast.success("Utilisateur supprimé");
       load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Erreur");
+      toast.error(messageErreur(err), { duration: 8000 });
     }
   };
 
