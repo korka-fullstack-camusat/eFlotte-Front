@@ -21,14 +21,20 @@ export default function ImportChauffeursModal({ onClose, onImporte }: { onClose:
   const [sms, setSms] = useState<StatutSms | null>(null);
   const [telTest, setTelTest] = useState("");
   const [testEnCours, setTestEnCours] = useState(false);
+  // Réponse brute d'Orange (ou erreur) au SMS de test : sert au diagnostic
+  const [reponseTest, setReponseTest] = useState<{ ok: boolean; texte: string } | null>(null);
 
   const testerSms = async () => {
     setTestEnCours(true);
+    setReponseTest(null);
     try {
       const r = await chauffeurComptesService.testerSms(telTest);
-      toast.success(`SMS de test envoyé au ${r.telephone}. Vérifiez sa réception avant l'import.`, { duration: 6000 });
+      setReponseTest({ ok: true, texte: r.reponse || "(réponse vide)" });
+      toast.success(`Orange a accepté le SMS pour ${r.telephone}. Vérifiez sa réception.`, { duration: 6000 });
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Envoi impossible", { duration: 10000 });
+      const detail = err?.response?.data?.detail;
+      setReponseTest({ ok: false, texte: typeof detail === "string" ? detail : err?.response ? `Erreur ${err.response.status}` : "Serveur injoignable" });
+      toast.error(typeof detail === "string" ? detail : "Envoi impossible", { duration: 10000 });
     } finally {
       setTestEnCours(false);
     }
@@ -134,6 +140,13 @@ export default function ImportChauffeursModal({ onClose, onImporte }: { onClose:
                       {testEnCours ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />} Envoyer un SMS de test
                     </button>
                   </div>
+                  {reponseTest && (
+                    <div role="status" className={`rounded-xl px-3 py-2 text-xs ring-1 ${reponseTest.ok ? "bg-emerald-50 ring-emerald-200 text-emerald-900" : "bg-red-50 ring-red-200 text-red-800"}`}>
+                      <p className="font-semibold mb-1">{reponseTest.ok ? "Réponse d'Orange SMS Pro :" : "Échec de l'envoi :"}</p>
+                      <pre className="whitespace-pre-wrap break-all font-mono select-all">{reponseTest.texte}</pre>
+                      <p className="mt-1 text-[11px] opacity-80">Si le SMS n'arrive pas, copiez ce texte pour le diagnostic.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </>
