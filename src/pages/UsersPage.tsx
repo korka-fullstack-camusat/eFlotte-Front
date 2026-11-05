@@ -27,8 +27,12 @@ export default function UsersPage() {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<UserAccount | null>(null);
   const [form, setForm] = useState(EMPTY);
-  // Création d'un chauffeur : identifiants envoyés par SMS au numéro saisi
-  const [envoyerSms, setEnvoyerSms] = useState(true);
+  const chauffeur = form.role === "CHAUFFEUR";
+  // Mot de passe initial des chauffeurs (configuré sur le serveur, « Camusat@2026 » par défaut)
+  const [motDePasseInitial, setMotDePasseInitial] = useState("Camusat@2026");
+  useEffect(() => {
+    chauffeurComptesService.statutSms().then(s => setMotDePasseInitial(s.mot_de_passe_initial)).catch(() => {});
+  }, []);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [vehicules, setVehicules] = useState<Vehicule[]>([]);
@@ -52,7 +56,7 @@ export default function UsersPage() {
   const pagedUsers = filtres.slice((page - 1) * pageSize, page * pageSize);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [pageCount, page]);
 
-  const openCreate = () => { setEditing(null); setForm(EMPTY); setEnvoyerSms(true); setModal(true); };
+  const openCreate = () => { setEditing(null); setForm(EMPTY); setModal(true); };
   const openEdit = (u: UserAccount) => {
     setEditing(u);
     setForm({ username: u.username, password: "", full_name: u.full_name ?? "", email: u.email ?? "", role: u.role, vehicule_plaque: u.vehicule_plaque ?? "", filiale: u.filiale ?? "", telephone: u.telephone ?? "" });
@@ -73,14 +77,12 @@ export default function UsersPage() {
         await userService.update(editing.id, payload);
         toast.success("Utilisateur mis à jour");
       } else {
-        const cree = await userService.create({
-          ...form, username: form.username.trim(),
-          vehicule_plaque: form.role === "CHAUFFEUR" ? form.vehicule_plaque : "",
-          filiale: form.role === "CHAUFFEUR" ? form.filiale : "",
-          envoyer_sms: form.role === "CHAUFFEUR" && envoyerSms,
-        });
+        // Chauffeur : identifiant, téléphone, véhicule ; mot de passe initial et SMS gérés par le serveur
+        const cree = await userService.create(chauffeur
+          ? { username: form.username.trim(), telephone: form.telephone, vehicule_plaque: form.vehicule_plaque, role: "CHAUFFEUR", envoyer_sms: true }
+          : { ...form, username: form.username.trim(), vehicule_plaque: "", filiale: "" });
         if (cree.sms === "ENVOYE") toast.success(`Compte créé · identifiants envoyés par SMS au ${cree.telephone}`, { duration: 6000 });
-        else if (cree.sms) toast(`Compte créé, mais SMS non envoyé : ${cree.sms_message ?? cree.sms}. Transmettez les identifiants au chauffeur ou réessayez avec « Envoyer les identifiants ».`, { icon: "⚠️", duration: 9000 });
+        else if (cree.sms) toast(`Compte créé, mais SMS non envoyé : ${cree.sms_message ?? cree.sms}. Transmettez au chauffeur : identifiant « ${cree.username} », mot de passe « ${cree.mot_de_passe_initial} », ou réessayez avec « Envoyer les identifiants ».`, { icon: "⚠️", duration: 12000 });
         else toast.success("Utilisateur créé");
       }
       setModal(false);
@@ -232,51 +234,57 @@ export default function UsersPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* Le rôle d'abord : un compte chauffeur ne demande que l'identifiant, le téléphone et le véhicule */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nom d'utilisateur *</label>
-                <input type="text" value={form.username} disabled={!!editing} required
-                  onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                  className="input-base disabled:opacity-60" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nom complet</label>
-                <input type="text" value={form.full_name}
-                  onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
-                  className="input-base" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
-                <input type="email" value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  className="input-base" />
-              </div>
-              <div>
-                <label htmlFor="user-tel" className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Téléphone {form.role === "CHAUFFEUR" && <span className="font-normal text-gray-400">(reçoit les identifiants par SMS)</span>}
-                </label>
-                <input id="user-tel" type="tel" value={form.telephone} placeholder="ex : 77 123 45 67"
-                  onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))} className="input-base" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Rôle</label>
-                <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="input-base">
+                <label htmlFor="user-role" className="block text-xs font-semibold text-gray-600 mb-1.5">Rôle</label>
+                <select id="user-role" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="input-base">
                   <option value="ADMIN">Administrateur</option>
                   <option value="EDITOR">Éditeur</option>
                   <option value="HSE">HSE</option>
                   <option value="VIEWER">Lecture seule</option>
                   <option value="CHAUFFEUR">Chauffeur (app mobile)</option>
                 </select>
-                {form.role === "CHAUFFEUR" && (
+                {chauffeur && (
                   <p className="mt-1 text-xs text-gray-500">Accès uniquement à l'application mobile de checklist véhicule.</p>
                 )}
               </div>
-              {form.role === "CHAUFFEUR" && (
+              <div>
+                <label htmlFor="user-username" className="block text-xs font-semibold text-gray-600 mb-1.5">Nom d'utilisateur *</label>
+                <input id="user-username" type="text" value={form.username} disabled={!!editing} required
+                  onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                  placeholder={chauffeur ? "ex : mdiop" : undefined}
+                  className="input-base disabled:opacity-60" />
+              </div>
+              {!chauffeur && (
+                <>
+                  <div>
+                    <label htmlFor="user-nom" className="block text-xs font-semibold text-gray-600 mb-1.5">Nom complet</label>
+                    <input id="user-nom" type="text" value={form.full_name}
+                      onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
+                      className="input-base" />
+                  </div>
+                  <div>
+                    <label htmlFor="user-email" className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
+                    <input id="user-email" type="email" value={form.email}
+                      onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                      className="input-base" />
+                  </div>
+                </>
+              )}
+              <div>
+                <label htmlFor="user-tel" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Téléphone {chauffeur && <>* <span className="font-normal text-gray-400">(reçoit ses identifiants par SMS)</span></>}
+                </label>
+                <input id="user-tel" type="tel" value={form.telephone} placeholder="ex : 77 123 45 67" required={chauffeur}
+                  onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))} className="input-base" />
+              </div>
+              {chauffeur && (
                 <div>
                   <label htmlFor="user-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Véhicule attribué</label>
                   <select id="user-vehicule" value={form.vehicule_plaque}
                     onChange={e => setForm(f => ({ ...f, vehicule_plaque: e.target.value }))} className="input-base">
-                    <option value="">Aucun (le chauffeur choisira à chaque rapport)</option>
+                    <option value="">Aucun (le chauffeur le choisira à son 1er rapport)</option>
                     {form.vehicule_plaque && !vehicules.some(v => v.plaque_immatriculation === form.vehicule_plaque) && (
                       <option value={form.vehicule_plaque}>{form.vehicule_plaque}</option>
                     )}
@@ -288,36 +296,24 @@ export default function UsersPage() {
                   </select>
                 </div>
               )}
-              {form.role === "CHAUFFEUR" && (
+              {chauffeur ? (
+                !editing && (
+                  <div className="rounded-xl bg-camublue-900/5 px-3 py-2.5 text-sm text-gray-700">
+                    Mot de passe initial : <span className="font-semibold text-gray-900">{motDePasseInitial}</span>.
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Envoyé par SMS avec le nom d'utilisateur ; le chauffeur le remplace par son propre mot de passe à la 1re connexion.
+                    </span>
+                  </div>
+                )
+              ) : (
                 <div>
-                  <label htmlFor="user-filiale" className="block text-xs font-semibold text-gray-600 mb-1.5">Filiale *</label>
-                  <input id="user-filiale" type="text" value={form.filiale} placeholder="ex : Camusat Sénégal" required
-                    onChange={e => setForm(f => ({ ...f, filiale: e.target.value }))} className="input-base" />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Véhicule et filiale sont repris dans chaque rapport : le chauffeur n'a pas à les saisir.
-                  </p>
+                  <label htmlFor="user-mdp" className="block text-xs font-semibold text-gray-600 mb-1.5">
+                    {editing ? "Nouveau mot de passe (optionnel)" : "Mot de passe *"}
+                  </label>
+                  <input id="user-mdp" type="password" value={form.password} required={!editing} minLength={editing ? undefined : 6}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                    className="input-base" />
                 </div>
-              )}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  {editing ? "Nouveau mot de passe (optionnel)" : "Mot de passe *"}
-                </label>
-                <input type="password" value={form.password} required={!editing}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                  className="input-base" />
-                {!editing && form.role === "CHAUFFEUR" && (
-                  <p className="mt-1 text-xs text-gray-500">Le chauffeur devra le remplacer par son propre mot de passe à la 1re connexion.</p>
-                )}
-              </div>
-              {!editing && form.role === "CHAUFFEUR" && (
-                <label className="flex items-start gap-2 rounded-xl bg-camublue-900/5 px-3 py-2.5 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={envoyerSms} onChange={e => setEnvoyerSms(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 accent-camublue-900" />
-                  <span>
-                    Envoyer l'identifiant et le mot de passe par SMS au chauffeur
-                    {!form.telephone && <span className="block text-xs text-amber-700">Saisissez son numéro de téléphone pour que le SMS parte.</span>}
-                  </span>
-                </label>
               )}
 
               <div className="flex gap-2 mt-2">
