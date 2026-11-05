@@ -28,6 +28,7 @@ import { useState, useEffect, useId } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAnnee } from "@/contexts/AnneeContext";
+import Marque from "@/components/brand/Marque";
 
 type NavItem = {
   label: string;
@@ -278,7 +279,7 @@ export default function Sidebar() {
       {/* Sidebar Desktop */}
       <aside className="bg-white shadow-md w-72 h-screen sticky top-0 hidden md:flex md:flex-col border-r overflow-y-auto">
         <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-center shrink-0">
-          <span className="text-2xl font-extrabold text-camublue-900 tracking-tight">P.A.R.C-CAM</span>
+          <Marque taille="md" />
         </div>
         <SidebarContent />
       </aside>
@@ -290,7 +291,7 @@ export default function Sidebar() {
         } md:hidden`}
       >
         <div className="flex items-center justify-between px-5 py-5 border-b border-gray-100">
-          <span className="text-xl font-extrabold text-camublue-900 tracking-tight">P.A.R.C-CAM</span>
+          <Marque taille="sm" />
           <button onClick={() => setMobileOpen(false)}>
             <X size={24} className="text-camublue-900" />
           </button>

@@ -329,7 +329,7 @@ export default function ExportPage() {
         const blob2 = await toBlob([buildSinistres(ds.sinistres)]);
 
         setProgress("Création du dossier ZIP…");
-        const folderName = `Export_PARC-CAM_${y}${p.mois ? `_M${String(p.mois).padStart(2,"0")}` : ""}_${dateSuffix}`;
+        const folderName = `Export_eFlotte-Camusat_${y}${p.mois ? `_M${String(p.mois).padStart(2,"0")}` : ""}_${dateSuffix}`;
         const zip = new JSZip();
         const folder = zip.folder(folderName)!;
         folder.file(`TABLEAU DE BORD FLOTTE ANNEE ${y}.xlsx`, blob);
@@ -388,7 +388,7 @@ export default function ExportPage() {
         const ds = await loadSinistresData(p);
         const blob2 = await toBlob([buildSinistres(ds.sinistres)]);
         const dateSuffix = new Date().toISOString().slice(0, 10);
-        const folderName = `Export_PARC-CAM_${y}${p.mois ? `_M${String(p.mois).padStart(2,"0")}` : ""}_${dateSuffix}`;
+        const folderName = `Export_eFlotte-Camusat_${y}${p.mois ? `_M${String(p.mois).padStart(2,"0")}` : ""}_${dateSuffix}`;
         const zip = new JSZip();
         const folder = zip.folder(folderName)!;
         folder.file(`TABLEAU DE BORD FLOTTE ANNEE ${y}.xlsx`, blob);

@@ -209,7 +209,7 @@ export default function DashboardPage() {
               Gestion de parc automobile — {totalVehicules} véhicule{totalVehicules > 1 ? "s" : ""}
             </h2>
             <p className="text-white/70 text-xs sm:text-sm mt-0.5">
-              P.A.R.C-CAM — Logistique &amp; flotte &nbsp;·&nbsp; Période : <strong>{periodeLabel}</strong>
+              eFlotte - Camusat — Logistique &amp; flotte &nbsp;·&nbsp; Période : <strong>{periodeLabel}</strong>
             </p>
           </div>
         </div>
