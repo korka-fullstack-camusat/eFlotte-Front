@@ -561,6 +561,8 @@ export interface DemandeVehicule {
   kilometrage: number;
   position: string;
   technicien: string;
+  /** « Nature » : explication libre du chauffeur */
+  description: string | null;
   nom_chauffeur: string;
   telephone: string | null;
   statut: StatutDemande;

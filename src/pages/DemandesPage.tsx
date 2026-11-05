@@ -108,6 +108,10 @@ function ModalDemande({ demande, lectureSeule, onClose, onMaj }: {
             <BadgeStatut statut={demande.statut} />
             <span className="text-xs text-gray-500">Reçue le {formatDateHeure(demande.created_at)}</span>
           </div>
+          <div className="mt-3 mb-2 rounded-xl bg-camublue-900/5 p-3">
+            <p className="text-xs text-gray-500 mb-0.5">Nature</p>
+            <p className="text-sm text-gray-800 whitespace-pre-line">{demande.description || "—"}</p>
+          </div>
           <div className="grid sm:grid-cols-2 gap-x-4 divide-y sm:divide-y-0 divide-gray-50">
             <Ligne icon={<Gauge size={16} />} label="Kilométrage actuel">{formatKm(demande.kilometrage)}</Ligne>
             <Ligne icon={<MapPin size={16} />} label="Position">{demande.position}</Ligne>
@@ -226,10 +230,10 @@ export default function DemandesPage() {
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
             <input value={recherche} onChange={e => setRecherche(e.target.value)} aria-label="Rechercher"
-              placeholder="Immatriculation, chauffeur, technicien, position…" className="input-base !pl-9" />
+              placeholder="Immatriculation, nature, chauffeur, technicien, position…" className="input-base !pl-9" />
           </div>
-          <select value={nature} onChange={e => { setNature(e.target.value as NatureDemande | ""); setPage(1); }} aria-label="Nature" className="input-base !w-auto">
-            <option value="">Toutes les natures</option>
+          <select value={nature} onChange={e => { setNature(e.target.value as NatureDemande | ""); setPage(1); }} aria-label="Type" className="input-base !w-auto">
+            <option value="">Tous les types</option>
             {(Object.keys(NATURES) as NatureDemande[]).map(n => <option key={n} value={n}>{NATURES[n].label}</option>)}
           </select>
           <select value={statut} onChange={e => { setStatut(e.target.value as StatutDemande | ""); setPage(1); }} aria-label="Statut" className="input-base !w-auto">
@@ -260,14 +264,14 @@ export default function DemandesPage() {
             <table className="w-full text-sm">
               <thead className="bg-camublue-900 text-white text-xs uppercase">
                 <tr>
-                  <th scope="col" className="text-left px-4 py-2.5 font-semibold">Reçue le</th>
-                  <th scope="col" className="text-left px-4 py-2.5 font-semibold">Nature</th>
-                  <th scope="col" className="text-left px-4 py-2.5 font-semibold">Véhicule</th>
-                  <th scope="col" className="text-left px-4 py-2.5 font-semibold">Position</th>
-                  <th scope="col" className="text-left px-4 py-2.5 font-semibold">Technicien</th>
-                  <th scope="col" className="text-left px-4 py-2.5 font-semibold">Chauffeur</th>
-                  <th scope="col" className="text-left px-4 py-2.5 font-semibold">Statut</th>
-                  <th scope="col" className="text-center px-4 py-2.5 font-semibold">Action</th>
+                  <th scope="col" className="text-left px-3 py-2.5 font-semibold">Reçue le</th>
+                  <th scope="col" className="text-left px-3 py-2.5 font-semibold">Type · Nature</th>
+                  <th scope="col" className="text-left px-3 py-2.5 font-semibold">Véhicule</th>
+                  <th scope="col" className="text-left px-3 py-2.5 font-semibold">Position</th>
+                  <th scope="col" className="text-left px-3 py-2.5 font-semibold">Technicien</th>
+                  <th scope="col" className="text-left px-3 py-2.5 font-semibold">Chauffeur</th>
+                  <th scope="col" className="text-left px-3 py-2.5 font-semibold">Statut</th>
+                  <th scope="col" className="text-center px-3 py-2.5 font-semibold">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -275,24 +279,25 @@ export default function DemandesPage() {
                   const n = NATURES[d.nature];
                   return (
                     <tr key={d.id} className={`hover:bg-gray-50/60 ${d.statut === "NOUVELLE" ? "bg-red-50/40" : ""}`}>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">{formatDateHeure(d.created_at)}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 font-semibold ${n?.text ?? ""}`}>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{formatDateHeure(d.created_at)}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`inline-flex items-center gap-1.5 font-semibold whitespace-nowrap ${n?.text ?? ""}`}>
                           <span className="[&>svg]:w-4 [&>svg]:h-4" aria-hidden>{n?.icon}</span>{n?.label ?? d.nature}
                         </span>
+                        {d.description && <p className="text-xs text-gray-500 max-w-[180px] truncate" title={d.description}>{d.description}</p>}
                       </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                         <p className="font-semibold text-gray-800">{d.immatriculation}</p>
                         <p className="text-xs text-gray-400">{formatKm(d.kilometrage)}</p>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600 max-w-[200px] truncate" title={d.position}>{d.position}</td>
-                      <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{d.technicien}</td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
+                      <td className="px-3 py-2.5 text-gray-600 max-w-[150px] truncate" title={d.position}>{d.position}</td>
+                      <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{d.technicien}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                         <p className="font-medium text-gray-700">{d.nom_chauffeur}</p>
                         {d.telephone && <p className="text-xs text-gray-400">{d.telephone}</p>}
                       </td>
-                      <td className="px-4 py-2.5"><BadgeStatut statut={d.statut} /></td>
-                      <td className="px-4 py-2.5 text-center">
+                      <td className="px-3 py-2.5"><BadgeStatut statut={d.statut} /></td>
+                      <td className="px-3 py-2.5 text-center">
                         <button onClick={() => setOuverte(d)}
                           className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-camublue-900/10 text-camublue-900 hover:bg-camublue-900 hover:text-white transition whitespace-nowrap">
                           {isViewer ? "Voir" : d.statut === "NOUVELLE" ? "Traiter" : "Ouvrir"}
