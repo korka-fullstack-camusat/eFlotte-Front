@@ -167,11 +167,23 @@ export default function InspectionsPage() {
     setEnvoiRelance(true);
     try {
       if (relance.cible === "retard") {
-        const { relances } = await inspectionService.relancerEnRetard(relance.message);
-        toast.success(relances ? `${relances} chauffeur${relances > 1 ? "s" : ""} relancé${relances > 1 ? "s" : ""}` : "Aucun chauffeur en retard");
+        const { relances, sms } = await inspectionService.relancerEnRetard(relance.message);
+        toast.success(relances
+          ? `${relances} chauffeur${relances > 1 ? "s" : ""} relancé${relances > 1 ? "s" : ""}`
+            + (sms ? ` · SMS en cours d'envoi à ${sms} numéro${sms > 1 ? "s" : ""}` : "")
+          : "Aucun chauffeur en retard");
       } else {
-        await inspectionService.relancer(relance.cible.user_id, relance.message);
-        toast.success(`${relance.cible.full_name || relance.cible.username} a été relancé`);
+        const r = await inspectionService.relancer(relance.cible.user_id, relance.message);
+        const nom = relance.cible.full_name || relance.cible.username;
+        const SMS: Record<string, string> = {
+          ENVOYE: "SMS envoyé",
+          ECHEC: "le SMS n'a pas pu être envoyé",
+          SANS_NUMERO: "pas de numéro de téléphone, SMS non envoyé",
+          NON_CONFIGURE: "SMS non configuré sur le serveur",
+        };
+        const etat = r.sms ? SMS[r.sms] ?? r.sms : null;
+        if (r.sms && r.sms !== "ENVOYE") toast(`${nom} a été relancé dans l'app — ${etat}`, { icon: "⚠️" });
+        else toast.success(`${nom} a été relancé${etat ? ` · ${etat}` : ""}`);
       }
       setRelance(null);
       chargerSuivi();
@@ -415,7 +427,7 @@ export default function InspectionsPage() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-gray-600">
-                Un rappel s'affichera sur la page d'accueil de l'application du chauffeur, jusqu'à l'envoi de sa checklist.
+                Le chauffeur reçoit un SMS et une notification sur son téléphone ; le rappel reste affiché dans l'application jusqu'à l'envoi de sa checklist.
               </p>
               <div>
                 <label htmlFor="relance-msg" className="block text-xs font-semibold text-gray-600 mb-1.5">Message (facultatif)</label>

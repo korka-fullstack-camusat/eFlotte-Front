@@ -41,6 +41,6 @@ export const inspectionService = {
   },
   relancer: async (user_id: number, message?: string): Promise<RelanceChecklist> =>
     (await axios.post(`${BASE}/relances`, { user_id, message })).data,
-  relancerEnRetard: async (message?: string): Promise<{ relances: number }> =>
+  relancerEnRetard: async (message?: string): Promise<{ relances: number; sms?: number }> =>
     (await axios.post(`${BASE}/relances/en-retard`, { message })).data,
 };

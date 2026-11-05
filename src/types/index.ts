@@ -456,6 +456,9 @@ export interface RelanceChecklist {
   envoye_par: string | null;
   message: string | null;
   created_at: string;
+  /** Relance unitaire : ENVOYE | ECHEC | NON_CONFIGURE | SANS_NUMERO */
+  sms?: string | null;
+  sms_message?: string | null;
 }
 
 export interface MonEspace {
@@ -544,4 +547,35 @@ export interface StatutSms {
   signature?: string;
   app_url: string;
   mot_de_passe_initial: string;
+}
+
+// ── Demandes chauffeurs (remontée, panne, vidange) ──────────────────────────
+export type NatureDemande = "REMONTEE" | "PANNE" | "VIDANGE";
+export type StatutDemande = "NOUVELLE" | "EN_COURS" | "TRAITEE";
+
+export interface DemandeVehicule {
+  id: number;
+  user_id: number | null;
+  nature: NatureDemande;
+  immatriculation: string;
+  kilometrage: number;
+  position: string;
+  technicien: string;
+  nom_chauffeur: string;
+  telephone: string | null;
+  statut: StatutDemande;
+  commentaire: string | null;
+  traitee_par: string | null;
+  email_alerte_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface DemandePage { items: DemandeVehicule[]; total: number }
+
+export interface StatsDemandes {
+  nouvelles: number;
+  par_nature: Record<NatureDemande, Record<StatutDemande, number>>;
+  derniere_nouvelle: string | null;
+  total: number;
 }

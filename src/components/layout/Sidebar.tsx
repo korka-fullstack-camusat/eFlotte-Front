@@ -23,17 +23,22 @@ import {
   Fuel,
   Smartphone,
   CalendarDays,
+  Inbox,
 } from "lucide-react";
 import { useState, useEffect, useId } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAnnee } from "@/contexts/AnneeContext";
 import Marque from "@/components/brand/Marque";
+import ClocheDemandes from "@/components/demandes/ClocheDemandes";
+import { useDemandesNouvelles } from "@/components/demandes/useDemandesNouvelles";
 
 type NavItem = {
   label: string;
   path: string;
   icon: React.ReactNode;
+  /** Pastille : nombre d'éléments en attente */
+  badge?: "demandes";
 };
 
 type NavGroup = {
@@ -49,6 +54,7 @@ const isGroup = (e: NavEntry): e is NavGroup => "group" in e;
 const navEntries: NavEntry[] = [
   { label: "Tableau de bord", path: "/dashboard",     icon: <LayoutDashboard size={20} /> },
   { label: "Checklists chauffeurs", path: "/inspections", icon: <Smartphone size={20} /> },
+  { label: "Demandes", path: "/demandes", icon: <Inbox size={20} />, badge: "demandes" },
   {
     group: "Import / Export",
     icon: <UploadCloud size={20} />,
@@ -90,6 +96,17 @@ const navEntries: NavEntry[] = [
 
 const adminNavItem: NavItem = { label: "Comptes utilisateurs", path: "/users", icon: <Users size={20} /> };
 
+function BadgeDemandes({ actif }: { actif: boolean }) {
+  const n = useDemandesNouvelles() ?? 0;
+  if (!n) return null;
+  return (
+    <span className={`ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold leading-5 text-center ${actif ? "bg-white text-camublue-900" : "bg-red-600 text-white"}`}
+      aria-label={`${n} nouvelle${n > 1 ? "s" : ""}`}>
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
 function NavLink({ item, onClose }: { item: NavItem; onClose?: () => void }) {
   const location = useLocation();
   const isActive = location.pathname === item.path;
@@ -105,6 +122,7 @@ function NavLink({ item, onClose }: { item: NavItem; onClose?: () => void }) {
     >
       <span className="shrink-0">{item.icon}</span>
       <span className="truncate">{item.label}</span>
+      {item.badge === "demandes" && <BadgeDemandes actif={isActive} />}
     </Link>
   );
 }
@@ -269,6 +287,7 @@ export default function Sidebar() {
       >
         <Menu size={20} className="text-camublue-900" />
       </button>
+      <ClocheDemandes className="md:hidden fixed top-4 left-16 z-40" />
 
       {/* Overlay mobile */}
       <div
@@ -278,8 +297,9 @@ export default function Sidebar() {
 
       {/* Sidebar Desktop */}
       <aside className="bg-white shadow-md w-72 h-screen sticky top-0 hidden md:flex md:flex-col border-r overflow-y-auto">
-        <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-center shrink-0">
-          <Marque taille="md" />
+        <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-between gap-2 shrink-0">
+          <Marque taille="sm" />
+          <ClocheDemandes className="shrink-0" />
         </div>
         <SidebarContent />
       </aside>

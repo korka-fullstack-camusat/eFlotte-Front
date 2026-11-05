@@ -28,6 +28,7 @@ const UsersPage          = page(() => import("@/pages/UsersPage"));
 const CarburantPage      = page(() => import("@/pages/CarburantPage"));
 const RecapPannePage     = page(() => import("@/pages/RecapPannePage"));
 const InspectionsPage    = page(() => import("@/pages/InspectionsPage"));
+const DemandesPage       = page(() => import("@/pages/DemandesPage"));
 const ChauffeurHomePage       = page(() => import("@/pages/chauffeur/ChauffeurHomePage"));
 const ChauffeurHistoriquePage = page(() => import("@/pages/chauffeur/ChauffeurHistoriquePage"));
 const ChauffeurProfilPage     = page(() => import("@/pages/chauffeur/ChauffeurProfilPage"));
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/carburant" element={<ProtectedRoute><CarburantPage /></ProtectedRoute>} />
         <Route path="/recap-pannes" element={<ProtectedRoute><RecapPannePage /></ProtectedRoute>} />
         <Route path="/inspections" element={<ProtectedRoute><InspectionsPage /></ProtectedRoute>} />
+        <Route path="/demandes" element={<ProtectedRoute><DemandesPage /></ProtectedRoute>} />
 
         {/* App mobile chauffeur */}
         <Route path="/app" element={<ProtectedRoute chauffeur><ChauffeurHomePage /></ProtectedRoute>} />
