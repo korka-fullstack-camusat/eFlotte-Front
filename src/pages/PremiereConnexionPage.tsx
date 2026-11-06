@@ -18,7 +18,7 @@ export default function PremiereConnexionPage() {
   const [envoi, setEnvoi] = useState(false);
 
   if (!token) return <Navigate to="/login" replace />;
-  if (!user?.doit_changer_mdp) return <Navigate to={isChauffeur ? "/app" : "/dashboard"} replace />;
+  if (!user?.doit_changer_mdp) return <Navigate to={isChauffeur ? "/chauffeur" : "/dashboard"} replace />;
 
   const valider = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +29,7 @@ export default function PremiereConnexionPage() {
     try {
       await axios.post("/api/auth/me/mot-de-passe", { ancien, nouveau });
       motDePasseChange();
-      navigate(isChauffeur ? "/app" : "/dashboard", { replace: true });
+      navigate(isChauffeur ? "/chauffeur" : "/dashboard", { replace: true });
     } catch (err: any) {
       setErreur(err?.response?.data?.detail ?? "Impossible d'enregistrer, réessayez.");
     } finally {

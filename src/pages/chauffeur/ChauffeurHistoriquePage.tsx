@@ -29,7 +29,7 @@ export default function ChauffeurHistoriquePage() {
   return (
     <ChauffeurLayout>
       <div className="flex items-center gap-2 mb-4">
-        <Link to="/app" aria-label="Retour à l'accueil" className="w-9 h-9 rounded-xl bg-white ring-1 ring-gray-100 flex items-center justify-center">
+        <Link to="/chauffeur" aria-label="Retour à l'accueil" className="w-9 h-9 rounded-xl bg-white ring-1 ring-gray-100 flex items-center justify-center">
           <ChevronLeft size={18} className="text-camublue-900" />
         </Link>
         <div>

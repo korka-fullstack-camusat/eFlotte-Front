@@ -7,7 +7,7 @@ export default function LandingPage() {
   const { token, isChauffeur } = useAuth();
 
   // Déjà connecté (ex. app ouverte depuis l'écran d'accueil du téléphone) : aller à son espace
-  if (token) return <Navigate to={isChauffeur ? "/app" : "/dashboard"} replace />;
+  if (token) return <Navigate to={isChauffeur ? "/chauffeur" : "/dashboard"} replace />;
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">

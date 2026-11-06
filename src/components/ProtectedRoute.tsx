@@ -13,7 +13,7 @@ export default function ProtectedRoute({ children, chauffeur = false }: { childr
   if (!token) return <Navigate to="/login" replace />;
   if (user?.doit_changer_mdp) return <Navigate to="/premiere-connexion" replace />;
   if (chauffeur && !isChauffeur) return <Navigate to="/dashboard" replace />;
-  if (!chauffeur && isChauffeur) return <Navigate to="/app" replace />;
+  if (!chauffeur && isChauffeur) return <Navigate to="/chauffeur" replace />;
   // Plateforme : changer d'année recharge la page (et toutes ses données) avec la nouvelle année
   return chauffeur ? <>{children}</> : <Fragment key={annee}>{children}</Fragment>;
 }

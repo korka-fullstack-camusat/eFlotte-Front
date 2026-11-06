@@ -72,7 +72,7 @@ export default function ChauffeurHomePage() {
             <div className="flex items-center justify-between mb-2">
               <h2 id="derniers-titre" className="text-sm font-bold text-camublue-900">Derniers rapports envoyés</h2>
               {espace.derniers_rapports.length > 0 && (
-                <Link to="/app/historique" className="inline-flex items-center gap-0.5 text-sm font-semibold text-camublue-900 hover:underline">
+                <Link to="/chauffeur/historique" className="inline-flex items-center gap-0.5 text-sm font-semibold text-camublue-900 hover:underline">
                   Voir plus <ChevronRight size={15} />
                 </Link>
               )}

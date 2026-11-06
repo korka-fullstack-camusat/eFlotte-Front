@@ -33,6 +33,7 @@ const ChauffeurHomePage       = page(() => import("@/pages/chauffeur/ChauffeurHo
 const ChauffeurHistoriquePage = page(() => import("@/pages/chauffeur/ChauffeurHistoriquePage"));
 const ChauffeurProfilPage     = page(() => import("@/pages/chauffeur/ChauffeurProfilPage"));
 const PremiereConnexionPage   = page(() => import("@/pages/PremiereConnexionPage"));
+const AppMobilePage           = page(() => import("@/pages/AppMobilePage"));
 
 function PageLoader() {
   return (
@@ -54,6 +55,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        {/* Page publique à partager : téléchargement de l'application mobile (APK) */}
+        <Route path="/app" element={<AppMobilePage />} />
         <Route path="/premiere-connexion" element={<PremiereConnexionPage />} />
 
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
@@ -75,9 +78,9 @@ export default function App() {
         <Route path="/demandes" element={<ProtectedRoute><DemandesPage /></ProtectedRoute>} />
 
         {/* App mobile chauffeur */}
-        <Route path="/app" element={<ProtectedRoute chauffeur><ChauffeurHomePage /></ProtectedRoute>} />
-        <Route path="/app/historique" element={<ProtectedRoute chauffeur><ChauffeurHistoriquePage /></ProtectedRoute>} />
-        <Route path="/app/profil" element={<ProtectedRoute chauffeur><ChauffeurProfilPage /></ProtectedRoute>} />
+        <Route path="/chauffeur" element={<ProtectedRoute chauffeur><ChauffeurHomePage /></ProtectedRoute>} />
+        <Route path="/chauffeur/historique" element={<ProtectedRoute chauffeur><ChauffeurHistoriquePage /></ProtectedRoute>} />
+        <Route path="/chauffeur/profil" element={<ProtectedRoute chauffeur><ChauffeurProfilPage /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

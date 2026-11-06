@@ -49,7 +49,7 @@ export default function ChauffeurLayout({ children }: { children: React.ReactNod
                 <span className="sr-only">Mon véhicule : </span>{plaque}
               </span>
             )}
-            <Link to="/app/profil" aria-label="Mon profil"
+            <Link to="/chauffeur/profil" aria-label="Mon profil"
               className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 ring-1 ring-white/25 flex items-center justify-center shrink-0 text-xs font-bold transition">
               {initiales || <UserRound size={18} />}
             </Link>
@@ -62,9 +62,9 @@ export default function ChauffeurLayout({ children }: { children: React.ReactNod
       <nav aria-label="Navigation principale"
         className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-100 pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-2xl mx-auto flex">
-          <NavLink to="/app" end className={onglet}><Home size={20} aria-hidden />Accueil</NavLink>
-          <NavLink to="/app/historique" className={onglet}><History size={20} aria-hidden />Historique</NavLink>
-          <NavLink to="/app/profil" className={onglet}><UserRound size={20} aria-hidden />Profil</NavLink>
+          <NavLink to="/chauffeur" end className={onglet}><Home size={20} aria-hidden />Accueil</NavLink>
+          <NavLink to="/chauffeur/historique" className={onglet}><History size={20} aria-hidden />Historique</NavLink>
+          <NavLink to="/chauffeur/profil" className={onglet}><UserRound size={20} aria-hidden />Profil</NavLink>
         </div>
       </nav>
 
