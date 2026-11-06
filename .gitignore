@@ -22,3 +22,8 @@ sketch
 
 # Variables locales (docker compose) — voir .env.example
 .env
+
+# Fichiers générés par « tsc -b » : un vite.config.js prendrait le pas sur vite.config.ts
+vite.config.js
+vite.config.d.ts
+*.tsbuildinfo
