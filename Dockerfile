@@ -9,4 +9,5 @@ COPY . .
 
 EXPOSE 5175
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Production par défaut (site construit, sans code source) ; FRONT_MODE=dev pour le rechargement à chaud
+CMD ["sh", "deploy/demarrer.sh"]

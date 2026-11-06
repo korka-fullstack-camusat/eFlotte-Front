@@ -1,4 +1,6 @@
-# Front eFlotte (Vite, rechargement à chaud)
+# Front eFlotte
+#   Par défaut (FRONT_MODE=production) : site construit et servi sans le code source.
+#   Poste de développement : FRONT_MODE=dev dans .env pour le rechargement à chaud.
 #
 #   cp .env.example .env      (une seule fois, puis adapter les valeurs)
 #   docker compose up --build
@@ -19,6 +21,9 @@ services:
       - "${FRONT_PORT:-5175}:5175"
     environment:
       VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:?Définir VITE_PROXY_TARGET dans .env}
+      FRONT_MODE: ${FRONT_MODE:-production}
+      # Vide = l'API est appelée sur la même adresse que le site (/api relayé)
+      VITE_API_URL: ${VITE_API_URL:-}
     volumes:
       - .:/app
       - /app/node_modules
@@ -29,4 +34,4 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 120s   # la construction du site prend environ 1 minute
