@@ -297,6 +297,7 @@ export default function UsersPage() {
                 <div>
                   <label htmlFor="user-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Véhicule attribué</label>
                   <RechercheVehicule id="user-vehicule" vehicules={vehicules} valeur={form.vehicule_plaque}
+                    dejaAttribues={users.filter(u => u.id !== editing?.id && u.vehicule_plaque).map(u => u.vehicule_plaque as string)}
                     onChange={plaque => setForm(f => ({ ...f, vehicule_plaque: plaque }))} />
                   {!form.vehicule_plaque && <p className="mt-1 text-xs text-gray-400">Sans véhicule, le chauffeur le saisira à son 1er rapport.</p>}
                 </div>

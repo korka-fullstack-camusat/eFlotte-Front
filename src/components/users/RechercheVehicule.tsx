@@ -12,11 +12,13 @@ const MAX = 8;
  * longue liste déroulante. Valeur vide = aucun véhicule attribué.
  * Clavier : ↑ ↓ pour parcourir, Entrée pour choisir, Échap pour fermer.
  */
-export default function RechercheVehicule({ id, vehicules, valeur, onChange }: {
+export default function RechercheVehicule({ id, vehicules, valeur, onChange, dejaAttribues = [] }: {
   id?: string;
   vehicules: Vehicule[];
   valeur: string;                    // plaque choisie ou ""
   onChange: (plaque: string) => void;
+  /** Plaques déjà attribuées à d'autres comptes : retirées de la liste */
+  dejaAttribues?: string[];
 }) {
   const listeId = useId();
   const [texte, setTexte] = useState("");
@@ -27,14 +29,20 @@ export default function RechercheVehicule({ id, vehicules, valeur, onChange }: {
 
   const choisi = vehicules.find(v => v.plaque_immatriculation === valeur);
 
+  const pris = useMemo(() => new Set(dejaAttribues.map(cle)), [dejaAttribues]);
+  const libres = useMemo(() => vehicules.filter(v => !pris.has(cle(v.plaque_immatriculation))), [vehicules, pris]);
+  const nbPris = vehicules.length - libres.length;
+
   const resultats = useMemo(() => {
     const k = cle(texte);
     const mots = texte.toLowerCase().split(/\s+/).filter(Boolean);
-    const liste = !texte.trim() ? vehicules : vehicules.filter(v =>
+    const liste = !texte.trim() ? libres : libres.filter(v =>
       cle(v.plaque_immatriculation).includes(k)
       || mots.every(m => `${v.plaque_immatriculation} ${libelle(v)}`.toLowerCase().includes(m)));
     return liste.slice(0, MAX);
-  }, [texte, vehicules]);
+  }, [texte, libres]);
+  // La plaque tapée correspond à un véhicule déjà attribué : on le dit
+  const tapeePrise = texte.trim() !== "" && resultats.length === 0 && pris.has(cle(texte));
 
   // Clic en dehors : fermer la liste
   useEffect(() => {
@@ -85,7 +93,10 @@ export default function RechercheVehicule({ id, vehicules, valeur, onChange }: {
           className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-xl bg-white shadow-lg ring-1 ring-gray-200 py-1">
           {resultats.length === 0 ? (
             <li className="px-3 py-2.5 text-sm text-gray-500">
-              {vehicules.length ? `Aucun véhicule ne correspond à « ${texte.trim()} ».` : "Chargement des véhicules…"}
+              {!vehicules.length ? "Chargement des véhicules…"
+                : tapeePrise ? `Le véhicule « ${texte.trim().toUpperCase()} » est déjà attribué à un autre compte.`
+                : !libres.length ? "Tous les véhicules sont déjà attribués."
+                : `Aucun véhicule libre ne correspond à « ${texte.trim()} ».`}
             </li>
           ) : resultats.map((v, i) => (
             <li key={v.id} id={`${listeId}-${i}`} role="option" aria-selected={i === actif}
@@ -95,8 +106,11 @@ export default function RechercheVehicule({ id, vehicules, valeur, onChange }: {
               {libelle(v) && <span className="text-sm text-gray-500 truncate">{libelle(v)}</span>}
             </li>
           ))}
-          {vehicules.length > MAX && resultats.length === MAX && (
-            <li className="px-3 py-1.5 text-xs text-gray-400 border-t border-gray-100">Tapez pour affiner la recherche…</li>
+          {(libres.length > MAX && resultats.length === MAX || nbPris > 0) && (
+            <li className="px-3 py-1.5 text-xs text-gray-400 border-t border-gray-100">
+              {libres.length > MAX && resultats.length === MAX ? "Tapez pour affiner la recherche… " : ""}
+              {nbPris > 0 ? `${nbPris} véhicule${nbPris > 1 ? "s" : ""} déjà attribué${nbPris > 1 ? "s" : ""} non proposé${nbPris > 1 ? "s" : ""}.` : ""}
+            </li>
           )}
         </ul>
       )}
