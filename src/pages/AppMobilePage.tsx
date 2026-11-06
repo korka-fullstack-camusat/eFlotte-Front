@@ -4,9 +4,9 @@ import Marque from "@/components/brand/Marque";
 
 /**
  * Page publique /app : lien à partager aux chauffeurs pour télécharger l'application
- * Android (APK déposé sur le serveur dans telechargements/eflotte.apk, servi par Caddy).
+ * Android (APK déposé sur le serveur dans telechargements/eflotte-camusat.apk, servi par Caddy).
  */
-const APK = "/telechargements/eflotte.apk";
+const APK = "/telechargements/eflotte-camusat.apk";
 
 type Infos = { etat: "chargement" } | { etat: "absent" } | { etat: "ok"; taille: number | null; date: string | null };
 
