@@ -7,6 +7,7 @@ import Pagination from "@/components/Pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import { userService, vehiculeService, chauffeurComptesService } from "@/services/api";
 import ImportChauffeursModal from "@/components/users/ImportChauffeursModal";
+import RechercheVehicule from "@/components/users/RechercheVehicule";
 import type { UserAccount, Vehicule } from "@/types";
 
 
@@ -295,18 +296,9 @@ export default function UsersPage() {
               {chauffeur && (
                 <div>
                   <label htmlFor="user-vehicule" className="block text-xs font-semibold text-gray-600 mb-1.5">Véhicule attribué</label>
-                  <select id="user-vehicule" value={form.vehicule_plaque}
-                    onChange={e => setForm(f => ({ ...f, vehicule_plaque: e.target.value }))} className="input-base">
-                    <option value="">Aucun (le chauffeur le choisira à son 1er rapport)</option>
-                    {form.vehicule_plaque && !vehicules.some(v => v.plaque_immatriculation === form.vehicule_plaque) && (
-                      <option value={form.vehicule_plaque}>{form.vehicule_plaque}</option>
-                    )}
-                    {vehicules.map(v => (
-                      <option key={v.id} value={v.plaque_immatriculation}>
-                        {v.plaque_immatriculation}{v.marque || v.modele ? ` — ${[v.marque, v.modele].filter(Boolean).join(" ")}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <RechercheVehicule id="user-vehicule" vehicules={vehicules} valeur={form.vehicule_plaque}
+                    onChange={plaque => setForm(f => ({ ...f, vehicule_plaque: plaque }))} />
+                  {!form.vehicule_plaque && <p className="mt-1 text-xs text-gray-400">Sans véhicule, le chauffeur le saisira à son 1er rapport.</p>}
                 </div>
               )}
               {chauffeur ? (
